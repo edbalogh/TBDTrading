@@ -4,25 +4,12 @@ This project aims to provide a consolidated platform for algorithm model trading
 
 Custom strategies will be created (eventually in the web application) that can consume events and make decisions to enter and exit trades with a broker (or across brokers).  The custom strategies will extend base classes provided by the platform that will handle the bi-directionaly communication between all providers.  This includes listening to providers as well as placing and managing order and positions across brokers or exchanges.
 
+[![Master Coverage](https://img.shields.io/coveralls/github/edbalogh/TBDTrading/master.svg)](https://coveralls.io/github/edbalogh/TBDTrading?branch=master)
 
-## Contributors
-[![GitHub contributors](https://img.shields.io/github/contributors/cdnjs/cdnjs.svg?style=flat)]()  
-
-## Hits
-[![HitCount](http://hits.dwyl.io/tterb/Hyde.svg)](http://hits.dwyl.io/tterb/Hyde)
-[![Implementations](https://img.shields.io/badge/%F0%9F%92%A1-implementations-8C8E93.svg?style=flat)](https://github.com/kentcdodds/all-contributors/blob/master/other/IMPLEMENTATIONS.md)  
-
-<br>
-
-## Package Managers
-#### NPM  
-[![NPM Version](https://img.shields.io/npm/v/npm.svg?style=flat)]()
-[![NPM License](https://img.shields.io/npm/l/all-contributors.svg?style=flat)](https://github.com/tterb/hyde/blob/master/LICENSE)
-[![NPM Downloads](https://img.shields.io/npm/dt/express.svg?style=flat)]()  
-[![Dependecy Status](https://david-dm.org/tterb/Hyde.svg)](https://david-dm.org/tterb/Hyde)  
-[![devDependencies Status](https://david-dm.org/tterb/Hyde/dev-status.svg)](https://david-dm.org/tterb/Hyde?type=dev)  
-[![NPM](https://nodei.co/npm/electron-download.png?downloads=true)](https://www.npmjs.com/package/electron-download)  
-
-
+## installation
 npm install
 copy config.dist.ts to config.ts and update keys
+
+
+## contributing
+Coming soon...currently in the planning and organizational phase
