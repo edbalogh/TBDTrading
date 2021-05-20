@@ -117,13 +117,4 @@ export class BinanceMarketData extends MarketDataProviderBase {
         this.marketSocket();
     }
 
-    stopUserDataStream() {
-        this.userSocket();
-    }
-
-    stopStreams() {
-        this.stopMarketDataStream();
-        this.stopUserDataStream();
-    }
-
 }

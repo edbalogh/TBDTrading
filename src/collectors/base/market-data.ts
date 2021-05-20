@@ -10,7 +10,6 @@ export class MarketDataProviderBase {
     isActive: boolean = false
     activeSymbols: string[] = []
     marketSocket: any
-    userSocket: any
 
 
     constructor(options: ProviderOptions, mode: Mode, client: any) {
@@ -88,8 +87,7 @@ export class MarketDataProviderBase {
      * Run processes prior to closing down the market data provider
      */
     async finalize(): Promise<null> {
-        this.marketSocket()
-        return this.userSocket()
+        return this.marketSocket()
     }
 
     /**
