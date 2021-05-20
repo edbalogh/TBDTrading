@@ -1,0 +1,1 @@
+export type Mode = 'LIVE' | 'PAPER' | 'BACKTEST'

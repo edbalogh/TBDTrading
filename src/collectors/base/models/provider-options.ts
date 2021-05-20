@@ -1,4 +1,4 @@
-type ProviderType = 'Broker' | 'MarketData' | 'Other'
+export type ProviderType = 'Broker' | 'MarketData' | 'Other'
 
 export interface ProviderOptions {
     id: string

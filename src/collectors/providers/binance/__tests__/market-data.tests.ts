@@ -2,7 +2,7 @@ import { BinanceMarketData } from '../market-data'
 
 describe("BinanceMarketData tests", () => {
     it("should standardize bar", () => {
-        const bmd = new BinanceMarketData( { id: 'test', providerType: 'MarketData', name: 'test' } )
+        const bmd = new BinanceMarketData( { id: 'test', providerType: 'MarketData', name: 'test' }, 'BACKTEST' )
 
         const testBar = {
             symbol: 'ADAUSDT',

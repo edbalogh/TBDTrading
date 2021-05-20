@@ -1,0 +1,2 @@
+import { BinanceMarketData } from './src/collectors/providers/binance/market-data'
+const binance = new BinanceMarketData({id: 'binance_live', providerType: 'MarketData', name: 'binance'}, 'LIVE')
