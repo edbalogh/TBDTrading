@@ -1,6 +1,7 @@
 import { ProviderOptions } from './models/provider-options'
 import { Mode } from '../../constants/types'
 import { indexOf } from 'lodash'
+import { HistoricalBarOptions, LiveBarOptions } from './models/options'
 
 export class MarketDataProviderBase {
     options: ProviderOptions
@@ -120,13 +121,13 @@ export class MarketDataProviderBase {
      * Pull historical bar data from API returning as a list of lists (Bar[symbol][bars])
      * @param options options for requesting bars from an api
      */
-    getHistoricalBarData(options: any): void { }
+    getHistoricalBarData(options: HistoricalBarOptions): void { }
 
     /**
      * Open socket to live bar data
      * @param options options for requesting bars from a websocket
      */
-    getLiveBarData(options: any): void { }
+    getLiveBarData(options: LiveBarOptions): void { }
 
     // TODO: getLiveTradeData()
     // TODO: getLiveOrderbookData()

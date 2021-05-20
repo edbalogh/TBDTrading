@@ -8,7 +8,7 @@
                 wsBase: "wss://stream.binance.us:9443/ws"
             },
         }
-2.  run ts-node poc/test_binance_marketdata.ts
+2.  run ts-node poc/test_binance_bar_live.ts
 3.  watch market data flow with translated 'bars'
 4.  ctrl-c to stop stream
 */
@@ -24,4 +24,4 @@ process.on('SIGINT', function() {
     process.exit();
 });
 
-binance.getLiveBarData({symbols: ['ADAUSDT', 'DOGEUSDT'], timeframe: '1m', showActive: true})
+binance.getLiveBarData({symbols: ['ADAUSDT', 'DOGEUSDT'], timeframe: '1m', showActive: false})

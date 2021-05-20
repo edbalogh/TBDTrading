@@ -3,8 +3,10 @@ import { MarketDataProviderBase } from '../../base/market-data'
 import { Bar } from '../../base/models/bar'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
 import { ProviderOptions } from '../../base/models/provider-options'
-import { last } from 'lodash'
+import { last, has } from 'lodash'
 import config from '../../../../config'
+import { HistoricalBarOptions, LiveBarOptions } from '../../base/models/options'
+import { BinanceBar } from './binance.types'
 const Binance = require('binance-api-node').default
 
 const utils = require('../../../utils/legacy.js')  // TODO: deprecate the legacy utils
@@ -30,10 +32,10 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return details
     }
 
-    translateBar(brokerBar: any): Bar {
+    translateBar(brokerBar: BinanceBar): Bar {
         const bar: Bar = {
             providerId: this.options.id,
-            start: barEpochTimeToUTC(brokerBar.startTime),
+            start: barEpochTimeToUTC(brokerBar.openTime),
             symbol: brokerBar.symbol,
             timeframe: brokerBar.interval,
             open: brokerBar.open,
@@ -41,24 +43,25 @@ export class BinanceMarketData extends MarketDataProviderBase {
             high: brokerBar.high,
             low: brokerBar.low,
             volume: brokerBar.volume,
-            inProgress: !brokerBar.isFinal, // barEpochTimeToUTC(brokerBar.closeTime).getTime() > new Date().getTime(),
-            end: brokerBar.closeTime,
+            inProgress: has(brokerBar, 'isFinal') ? !brokerBar.isFinal : barEpochTimeToUTC(brokerBar.closeTime || 0).getTime() > new Date().getTime(),
+            end: barEpochTimeToUTC(brokerBar.closeTime || 0),
         }
         return bar;
     }
 
-    async getHistoricalBarData(barOptions: any): Promise<Bar[][]> {
-        const finalOptions = this.translateHistoricalBarOptions(barOptions)
-        utils.logDetails(`getting bars from ${this.options.name}`, { timeframe: finalOptions.timeframe, options: finalOptions, symbols: this.activeSymbols });
+    async getHistoricalBarData(options: HistoricalBarOptions): Promise<Bar[][]> {
+        const finalOptions = this.translateHistoricalBarOptions(options)
+        const finalSymbols = options.symbols || this.activeSymbols
+        utils.logDetails(`getting bars from ${this.options.name}`, { timeframe: finalOptions.timeframe, options: finalOptions, symbols: finalSymbols });
 
         // builds a list of symbols each with a list of bars for that symbol
-        const allBars = await Promise.all(this.activeSymbols.map(async (s) => {
+        const allBars = await Promise.all(finalSymbols.map(async (s) => {
             let brokerBars: any[] = [];
             let batch = await this.client.candles( { interval: finalOptions.timeframe, symbol: s, ...finalOptions });
             brokerBars = brokerBars.concat(batch);
             // banance only allows 1000 bars at a time, this will keep requesting until the entire request is made
             // TODO: implement throttling here to control number of calls made to the API
-            while (batch.length === 1000 && (!barOptions.limit || brokerBars.length < barOptions.limit)) {
+            while (batch.length === 1000 && (!finalOptions.limit || brokerBars.length < finalOptions.limit)) {
                 const updatedOptions = {...finalOptions};
                 updatedOptions.startTime = Number(last(brokerBars).openTime) + 1000;
                 batch = await this.client.candles( { interval: finalOptions.timeframe, symbol: s, ...updatedOptions });
@@ -68,6 +71,8 @@ export class BinanceMarketData extends MarketDataProviderBase {
             // filter out any bars that are still building
             return brokerBars.filter(b => b && b.openTime && b.openTime > 0).map(b => {
                 b.symbol = s;
+                b.interval = finalOptions.interval
+                b.source = 'api'
                 return this.translateBar(b);
             });
         }));
@@ -76,28 +81,32 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return allBars;
     }
 
-    translateHistoricalBarOptions(barOptions: any): any {
+    translateHistoricalBarOptions(options: HistoricalBarOptions): any {
         const finalOptions: any = {};
 
-        if (barOptions.startDate) {
-            finalOptions.startTime = new Date(barOptions.startDate).getTime();
-            finalOptions.endTime = (barOptions.endDate) ? new Date(barOptions.endDate).getTime() : utils.currentTime().getTime();
-            if (!barOptions.limit) finalOptions.limit = 1000;
+        if (options.startDate || options.afterDate) {
+            finalOptions.startTime = new Date(options.startDate || options.afterDate || 0).getTime();
+            finalOptions.endTime = (options.endDate) ? new Date(options.endDate).getTime() : utils.currentTime().getTime();
+            if (!options.limit) finalOptions.limit = 1000;
         }
 
         // setting the default value in early stages
-        finalOptions.timeframe = barOptions.timeframe || '15m'
+        finalOptions.interval = options.timeframe || '15m'
         
-        if (barOptions.limit) finalOptions.limit ? Math.min(barOptions.limit, finalOptions.limit) : barOptions.limit;
+        if (options.limit) finalOptions.limit ? Math.min(options.limit, finalOptions.limit) : options.limit;
+
+        return finalOptions;
     }
 
-    async getLiveBarData(options: any) {
+    async getLiveBarData(options: LiveBarOptions) {
         this.marketSocket = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: any) => {
             switch (event.eventType) {
                 case 'kline':
+                    event.openTime = event.eventTime
                     const bar = this.translateBar(event)
-                    console.log(bar)
-                    break
+                    bar.source = 'ws'
+                    if (options.showActive || !bar.inProgress) console.log(bar)
+                    break;
                 default:
                     console.log(event)
             }

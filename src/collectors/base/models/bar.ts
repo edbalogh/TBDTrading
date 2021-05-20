@@ -7,6 +7,7 @@ export interface Bar {
     low: Number,
     open: Number,
     close: Number,
+    source?: string,
     inProgress: Boolean,
     volume?: Number,
     end?: Date,
