@@ -128,5 +128,5 @@ export class MarketDataProviderBase {
     getLiveBarData(options: LiveBarOptions): void { }
 
     // TODO: getLiveTradeData()
-    // TODO: getLiveOrderbookData()
+    // TODO: getLiveOrderBookData()
 }
