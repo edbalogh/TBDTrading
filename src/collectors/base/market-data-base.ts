@@ -20,6 +20,8 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     
     constructor(options: ProviderOptions, mode: Mode, client: any) {
         super()
+        if (!options.modes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
+        if (!options.providerTypes.includes('MarketData')) throw new Error(`Provider ${options.id} does not support providerType 'MarketData'`)
         this.id = options.id
         this.options = options
         this.mode = mode
@@ -152,7 +154,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {}
 
     startSocketServer() {
-        this.socketServer = startProviderServer()
+        this.socketServer = startProviderServer(this.options)
         this.socketServer.on("connect", (socket: Socket) => {
             console.log(`new connection,id=${socket.id}`)
         })
@@ -166,7 +168,8 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     }
 
     async startSocketListener() {
-        this.socketClient = io('http://localhost:3000')
+        const port = this.options.webSocketOptions ? this.options.webSocketOptions.port : 3000
+        this.socketClient = io(`http://localhost:${port}`)
         this.socketClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)
         })

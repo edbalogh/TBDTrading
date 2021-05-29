@@ -1,11 +1,13 @@
 #!/usr/bin/env ts-node
 
 import { OrderBook } from './src/collectors/base/models/order-book';
-import yargs, { Argv, option } from 'yargs'
+import yargs, { Argv } from 'yargs'
+import { ProviderOptions } from './src/collectors/base/models/provider-options'
+import config from './config'
 
 import { BinanceMarketData } from './src/collectors/providers/binance/binance-market-data'
 
-const argv = yargs
+yargs
     .command('demo', 'Run the live streaming bar demo', (yargs: Argv) => {
         const options = yargs.option("type", {
             describe: "Demo Type",
@@ -15,15 +17,30 @@ const argv = yargs
         return demo(options.argv.type)
     })
     .command('wsServer', 'Start a WebSocket Server', (yargs: Argv) => {
-        return wsServer()
+        return wsServer(yargs)
     })
     .command('wsListener', 'Start WebSocket Listener', (yars: Argv) => {
-        return wsClient()
+        return wsClient(yargs)
     })
     .argv;
 
-function wsServer() {
-    const binance = new BinanceMarketData({ id: 'binance_live', providerType: 'MarketData', name: 'binance' }, 'LIVE')
+function wsServer(yargs: Argv) {
+    const options = yargs.option('symbols', {
+        describe: 'Symbol List (comma separated)',
+        alias: 's',
+        default: 'ADAUSDT,DOGEUSDT',
+        type: 'string'
+    })
+        .options('providerId', {
+            describe: 'providerId',
+            alias: 'i',
+            default: 'binance',
+            type: 'string'
+        }).argv
+
+    const symbols = options.symbols.split(',')
+    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)
+    const binance = new BinanceMarketData(providerOptions, 'LIVE')
     binance.startSocketServer()
 
     process.on('SIGINT', function () {
@@ -32,13 +49,31 @@ function wsServer() {
         process.exit();
     });
 
-    binance.getLiveOrderBook({symbols: ['ADAUSDT', 'BTCUSDT' ]})
+    binance.getLiveOrderBook({symbols})
 }
 
-async function wsClient() {
-    const binance = new BinanceMarketData({ id: 'binance_live', providerType: 'MarketData', name: 'binance' }, 'LIVE')
-    binance.on('ADAUSDT.book', (e: any) => console.log(e))
+async function wsClient(yargs: Argv) {
+    const options = yargs.option('symbols', {
+        describe: 'Symbol List (comma separated)',
+        alias: 's',
+        default: 'ADAUSDT,DOGEUSDT',
+        type: 'string'
+    })
+        .option('providerId', {
+            describe: 'providerId',
+            alias: 'i',
+            default: 'binance',
+            type: 'string'
+        }).argv
 
+    const symbols = options.symbols.split(',')
+    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const binance = new BinanceMarketData(providerOptions, 'LIVE')
+    
+    symbols.forEach(s => {
+        binance.on(`${s}.book`, (e: any) => console.log(e))
+    })
+    
     process.on('SIGINT', function () {
         console.log("Caught interrupt signal, closing socket");
         binance.stopSocketListener()
@@ -80,12 +115,16 @@ function liveBarDemo() {
             default: false,
             type: "boolean"
         })
+        .option('providerId', {
+            describe: 'providerId',
+            alias: 'i',
+            default: 'binance',
+            type: 'string'
+        }).argv
 
-    console.log(options)
-
-    const binance = new BinanceMarketData({ id: 'binance_live', providerType: 'MarketData', name: 'binance' }, 'LIVE')
-    
-    const symbols = options.argv.symbols.split(',')
+    const symbols = options.symbols.split(',')
+    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const binance = new BinanceMarketData(providerOptions, 'LIVE')
     symbols.forEach(s => {
         binance.on(`${s}.bar`, (book) => console.log(book))
     })
@@ -97,7 +136,7 @@ function liveBarDemo() {
         process.exit();
     });
 
-    binance.getLiveBarData({ symbols: options.argv.symbols.split(','), timeframe: '1m', showActive: options.argv.inProgress })
+    binance.getLiveBarData({ symbols, timeframe: '1m', showActive: options.inProgress })
 
 }
 
@@ -126,9 +165,16 @@ function historicalBarDemo() {
             type: "string",
             default: "2021-01-01"
         })
-    const binance = new BinanceMarketData({ id: 'binance_live', providerType: 'MarketData', name: 'binance' }, 'LIVE')
+        .option('providerId', {
+            describe: 'providerId',
+            alias: 'i',
+            default: 'binance',
+            type: 'string'
+        }).argv
 
-    const symbols = options.argv.symbols.split(',')
+    const symbols = options.symbols.split(',')
+    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const binance = new BinanceMarketData(providerOptions, 'LIVE')
     symbols.forEach(s => {
         binance.on(`${s}.bar`, (book) => console.log(book))
     })
@@ -140,7 +186,7 @@ function historicalBarDemo() {
         process.exit();
     });
 
-    binance.getHistoricalBarData({ symbols: options.argv.symbols.split(','), timeframe: options.argv.timeframe, limit: options.argv.limit, afterDate: new Date(options.argv.afterDate) })
+    binance.getHistoricalBarData({ symbols, timeframe: options.timeframe, limit: options.limit, afterDate: new Date(options.afterDate) })
 }
 
 function liveOrderBookDemo() {
@@ -150,9 +196,16 @@ function liveOrderBookDemo() {
         default: "ADAUSDT,DOGEUSDT",
         type: "string"
     })
+    .options('providerId', {
+        describe: 'providerId',
+        alias: 'i',
+        default: 'binance',
+        type: 'string'
+    }).argv
 
-    const symbols = options.argv.symbols.split(',')
-    const binance = new BinanceMarketData({ id: 'binance_live', providerType: 'MarketData', name: 'binance' }, 'LIVE')
+    const symbols = options.symbols.split(',')
+    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const binance = new BinanceMarketData(providerOptions, 'LIVE')
 
     symbols.forEach(s => {
         binance.on(`${s}.book`, (book) => console.log(book))
@@ -181,13 +234,21 @@ function basicArbitrageDemo() {
             default: false,
             type: "boolean"
         })
+        .options('providerId', {
+            describe: 'providerId',
+            alias: 'i',
+            default: 'binance',
+            type: 'string'
+        }).argv
+
+    const symbols = options.symbols.split(',')
+    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const binance = new BinanceMarketData(providerOptions, 'LIVE')
     const latestBook: Map<string, OrderBook> = new Map()
-    const binance = new BinanceMarketData({ id: 'binance_live', providerType: 'MarketData', name: 'binance' }, 'LIVE')
+   
     let total = 0.0
     let tradeCount = 0
     let noFeeTotal = 0
-
-    const symbols = options.argv.symbols.split(',')
     
     symbols.forEach(s => {
         binance.on(`${s}.book`, (book) => {
@@ -255,7 +316,7 @@ function basicArbitrageDemo() {
         console.log(` TOTAL ${opportunity - fees}`)
         console.log(` GRAND TOTAL ${total}`)
         console.log(`*******`)
-        if (options.argv.verbose) {
+        if (options.verbose) {
             console.log(buyBook)
             console.log(sellBook)
         }

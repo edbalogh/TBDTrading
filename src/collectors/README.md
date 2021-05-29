@@ -31,8 +31,11 @@ The Template area will include templates that can be used as a starting point fo
 ## parameterDetails() method
 Each class will contain a 'parameterDetails' method that contains the information for building out a form in the UI with the parameters that are available for each entity.
 
+
 # WebSockets and Streaming
-## Topics
-*data.bar.<symbol>*
-*data.book.<symbol>*
-*broker.order.<symbol>*
+The provider base class will implement methods to start websocket/streaming services as well as individual listeners to those services.  The details about the connection (url, port, etc...) will pulled from the config.ts file at run time.
+
+## Topics/Events
+*${symbol}.bar*
+*${symbol}.book*
+*${symbol}.order*

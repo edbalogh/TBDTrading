@@ -2,16 +2,19 @@ import cors from 'cors'
 import express, {Express, NextFunction, Request, Response} from 'express'
 import http from 'http'
 import {Server, Socket} from 'socket.io'
-import config from '../../../config'
+import { ProviderOptions } from './models/provider-options'
 
-export function startProviderServer() {
+export function startProviderServer(options: ProviderOptions) {
     const app: Express = express();
     const server = http.createServer(app);
     const io = new Server(server);
+    // const provider = config.providers.get(providerId)
 
-    server.listen(config.webServer.port, () => console.log(`Listening on port: ${config.webServer.port}`));
+    const port = options.webSocketOptions ? options.webSocketOptions.port : 3000
 
-    app.use(express.json());
+    server.listen(port, () => console.log(`Listening on port: ${port}`));
+
+    app.use(express.json()); 
     app.use(cors());
 
     app.use((err: any, req: Request, res: Response, next: NextFunction) => next(res.status(err.output.statusCode).json(err.output.payload)));

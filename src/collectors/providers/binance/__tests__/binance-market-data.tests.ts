@@ -4,11 +4,15 @@ import { buildLiveBar } from '../__data__/liveBars'
 import { EventEmitter } from "events"
 import { Bar } from "../../../base/models/bar"
 import { Candle, CandlesOptions } from 'binance-api-node'
+import { ProviderOptions } from '../../../base/models/provider-options'
 import * as ws from "ws"
 
 const Events = new EventEmitter()
 
 let bmd: any = {};
+let defaultOptions: ProviderOptions = {
+    id: 'test', providerTypes: ['MarketData'], name: 'test', modes: ['BACKTEST'], apiOptions: new Map()
+}
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -21,7 +25,7 @@ afterEach(() => {
 describe("BinanceMarketData Historical Bar tests", () => {   
 
     test('should translate historical bars', () => {
-        const bmd = new BinanceMarketData({ id: 'test', providerType: 'MarketData', name: 'test' }, 'BACKTEST')
+        const bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
         const testBar = buildHistoricalBar()
         const histBar = bmd.translateHistoricalBar(testBar, '1m', 'DOGEUSDT')
         expect(histBar.start).toStrictEqual(new Date(1610370000000))
@@ -44,7 +48,7 @@ describe("BinanceMarketData Historical Bar tests", () => {
 
     test('should get historical bar data', async () => {
         const bars: Bar[] = []
-        const bmd = new BinanceMarketData({ id: 'test', providerType: 'MarketData', name: 'test' }, 'BACKTEST')
+        const bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
         bmd.on('bar', x => bars.push(x))
         const currTime = new Date().getTime()
         bmd.client.candles = jest.fn()
@@ -62,7 +66,7 @@ describe("BinanceMarketData Historical Bar tests", () => {
     })
 
     test('should translate historical bar options', () => {
-        const bmd = new BinanceMarketData({ id: 'test', providerType: 'MarketData', name: 'test' }, 'BACKTEST')
+        const bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
         
         // basic example with a start and end date (no limit)
         expect(bmd.translateHistoricalBarOptions({timeframe: '5m', startDate: new Date('2020-01-01'), endDate: new Date('2020-12-31') }))
@@ -84,7 +88,7 @@ describe("BinanceMarketData Historical Bar tests", () => {
 
 describe('BinanceMarketData Live Bar tests', () => {
     beforeEach(() => {
-        bmd = new BinanceMarketData({ id: 'test', providerType: 'MarketData', name: 'test' }, 'BACKTEST')
+        bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
     })
 
     test("should translate live bars", () => {        

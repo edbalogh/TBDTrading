@@ -1,1 +1,5 @@
-{}
+{
+  "dependencies": {
+    "binance-api-node": "^0.10.45"
+  }
+}

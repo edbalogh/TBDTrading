@@ -15,7 +15,7 @@ const utils = require('../../../utils/legacy.js')  // TODO: deprecate the legacy
 export class BinanceMarketData extends MarketDataProviderBase {
 
     constructor(options: ProviderOptions, mode: Mode) {
-        const client = new Binance(config.providers.binance_live.apiOptions)  // TODO: pull the provider dynamically
+        const client = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
         super(options, mode, client)
     }
 
