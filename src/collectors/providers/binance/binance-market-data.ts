@@ -130,7 +130,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
 
     _sendBarBatchEvents(bars: any, interval: string, symbol: string): void {
         bars.filter((b:any) => b && b.openTime && b.openTime > 0).forEach((b:any) => {
-            this.emitter(`${b.symbol}.bar`, this.translateHistoricalBar(b, interval, symbol))
+            this.emitter(`${symbol}.bar`, this.translateHistoricalBar(b, interval, symbol))
         })
     }
 
@@ -196,6 +196,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
         this.socketClient = this.client.ws.depth(options.symbols, (event:Depth) => {
             switch (event.eventType) {
                 case 'depthUpdate':
+                    console.log(event)
                     const book = this.translateLiveOrderBook(event)
                     if (book.bids.length > 0 && book.asks.length > 0) {
                         this.emitter(`${book.symbol}.book`, book)

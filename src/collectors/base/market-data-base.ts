@@ -125,12 +125,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * @param data data that goes with the event
      */
     emitter(event: string, data: any) {
-        if (this.socketServer) {
-            console.log(`sending ${event} event to socket server`)
-            this.socketServer.emit(event, data)
-        } else {
-            this.emit(event, data)
-        }        
+        this.socketServer ? this.socketServer.emit(event, data) : this.emit(event, data)
     }
 
     /**

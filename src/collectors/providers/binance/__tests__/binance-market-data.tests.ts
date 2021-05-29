@@ -1,11 +1,10 @@
 import { BinanceMarketData } from '../binance-market-data'
 import { buildHistoricalBar } from '../__data__/historicalBars'
 import { buildLiveBar } from '../__data__/liveBars'
+import { buildLiveOrderBook } from '../__data__/liveOrderBook'
 import { EventEmitter } from "events"
 import { Bar } from "../../../base/models/bar"
-import { Candle, CandlesOptions } from 'binance-api-node'
 import { ProviderOptions } from '../../../base/models/provider-options'
-import * as ws from "ws"
 
 const Events = new EventEmitter()
 
@@ -16,6 +15,7 @@ let defaultOptions: ProviderOptions = {
 
 beforeEach(() => {
     jest.clearAllMocks();
+    bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
 });
 
 afterEach(() => {
@@ -25,7 +25,6 @@ afterEach(() => {
 describe("BinanceMarketData Historical Bar tests", () => {   
 
     test('should translate historical bars', () => {
-        const bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
         const testBar = buildHistoricalBar()
         const histBar = bmd.translateHistoricalBar(testBar, '1m', 'DOGEUSDT')
         expect(histBar.start).toStrictEqual(new Date(1610370000000))
@@ -48,8 +47,8 @@ describe("BinanceMarketData Historical Bar tests", () => {
 
     test('should get historical bar data', async () => {
         const bars: Bar[] = []
-        const bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
-        bmd.on('bar', x => bars.push(x))
+        bmd.on('ADAUSDT.bar', (x: any) => bars.push(x))
+        bmd.on('ONEUSDT.bar', (x: any) => bars.push(x))
         const currTime = new Date().getTime()
         bmd.client.candles = jest.fn()
             .mockResolvedValueOnce([ buildHistoricalBar() ])
@@ -65,9 +64,7 @@ describe("BinanceMarketData Historical Bar tests", () => {
         expect(bmd.client.candles).toHaveBeenCalledTimes(2)
     })
 
-    test('should translate historical bar options', () => {
-        const bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
-        
+    test('should translate historical bar options', () => {        
         // basic example with a start and end date (no limit)
         expect(bmd.translateHistoricalBarOptions({timeframe: '5m', startDate: new Date('2020-01-01'), endDate: new Date('2020-12-31') }))
             .toStrictEqual({ interval: '5m', startTime: new Date('2020-01-01').getTime(), endTime: new Date('2020-12-31').getTime()})
@@ -87,10 +84,6 @@ describe("BinanceMarketData Historical Bar tests", () => {
 })
 
 describe('BinanceMarketData Live Bar tests', () => {
-    beforeEach(() => {
-        bmd = new BinanceMarketData(defaultOptions, 'BACKTEST')
-    })
-
     test("should translate live bars", () => {        
         const liveBar = buildLiveBar()
         const stdBar = bmd.translateLiveBar(liveBar)
@@ -109,26 +102,24 @@ describe('BinanceMarketData Live Bar tests', () => {
         expect(stdBar.providerId).toBe('test')
         expect(stdBar.source).toBe('live')
     })
+})
 
-    test.only("should stream live bar data", async () => {
-        const bars: Candle[] = []
-          
-        bmd.on('bar', (bar: Candle) => {
-            bars.push(bar)
-        })
-
-        const currTime = new Date().getTime()
-        bmd.client.ws.candles = jest.fn((options: any) => {
-            Events.emit('bar', buildLiveBar( { symbol: 'ADAUSDT' }))
-            Events.emit('bar', buildLiveBar({ symbol: 'DOGEUSDT', startTime: currTime - 2000, closeTime: currTime - 1001} ))
-            Events.emit('bar', buildLiveBar({ symbol: 'DOGEUSDT', startTime: currTime - 1000, closeTime: currTime - 1} ))
-        })
-
-        await bmd.getLiveBarData({interval: '1h'})
-        console.log(bars)
-        expect(bars).toHaveLength(3)
-        expect(bars.filter(x => x.symbol === 'ADAUSDT')).toHaveLength(1)
-        expect(bars.filter(x => x.symbol === 'ONEUSDT')).toHaveLength(2)
-        expect(bmd.client.ws.candles).toHaveBeenCalledTimes(1)    
+describe('BinanceMarketData Live OrderBook tests', () => {
+    test('should translate live order book (depth)', () => {
+        
+        const liveOrderBook = buildLiveOrderBook()
+        const stdOrderBook = bmd.translateLiveOrderBook(liveOrderBook)
+        expect(stdOrderBook.source).toBe('live')
+        expect(stdOrderBook.providerId).toBe('test')
+        expect(stdOrderBook.eventTime).toStrictEqual(new Date(1622301796490))
+        expect(stdOrderBook.symbol).toBe('DOGEUSDT')
+        expect(stdOrderBook.bids).toHaveLength(5)
+        expect(stdOrderBook.bids[0].price).toBe(0.28390740)
+        expect(stdOrderBook.bids[0].quantity).toBe(301)
+        expect(stdOrderBook.bids.find((b: any) => b.quantity == 0)).toBeFalsy
+        expect(stdOrderBook.asks).toHaveLength(3)
+        expect(stdOrderBook.asks[0].price).toBe(0.2840026)
+        expect(stdOrderBook.asks[0].quantity).toBe(358)
+        expect(stdOrderBook.asks.find((a: any) => a.quantity == 0)).toBeFalsy
     })
 })
