@@ -1,5 +1,8 @@
 {
-  "name": "TBDTrading",
+  "name": "tbd-trading",
+  "bin": {
+    "tbd": "tbd.ts"
+  },
   "version": "0.0.1",
   "description": "TBDTrading initialised with create-express-typescript-application.",
   "main": "src/index.ts",
@@ -38,6 +41,9 @@
   "dependencies": {
     "@types/jest": "^26.0.23",
     "@types/lodash": "^4.14.169",
+    "@types/socket.io": "^3.0.2",
+    "@types/ws": "^7.4.4",
+    "@types/yargs": "^15.0.13",
     "cors": "^2.8.5",
     "env-cmd": "^10.1.0",
     "express": "^4.17.1",
@@ -45,7 +51,11 @@
     "helmet": "^4.6.0",
     "lodash": "^4.17.21",
     "morgan": "^1.10.0",
-    "ts-jest": "^26.5.6"
+    "reconnecting-websocket": "^4.4.0",
+    "socket.io": "^4.1.2",
+    "socket.io-client": "^4.1.2",
+    "ts-jest": "^26.5.6",
+    "yargs": "^15.4.1"
   },
   "jest": {
     "collectCoverage": true,

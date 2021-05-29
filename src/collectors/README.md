@@ -30,3 +30,9 @@ The Template area will include templates that can be used as a starting point fo
 
 ## parameterDetails() method
 Each class will contain a 'parameterDetails' method that contains the information for building out a form in the UI with the parameters that are available for each entity.
+
+# WebSockets and Streaming
+## Topics
+*data.bar.<symbol>*
+*data.book.<symbol>*
+*broker.order.<symbol>*

@@ -12,3 +12,8 @@ export interface LiveBarOptions {
     timeframe?: string,
     showActive?: boolean
 }
+
+
+export interface LiveOrderBookOptions {
+    symbols: string[]
+}

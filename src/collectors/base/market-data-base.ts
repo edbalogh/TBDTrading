@@ -1,18 +1,26 @@
 import { ProviderOptions } from './models/provider-options'
 import { Mode } from '../../constants/types'
 import { indexOf } from 'lodash'
-import { HistoricalBarOptions, LiveBarOptions } from './models/options'
+import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions } from './models/options'
+import { EventEmitter } from 'events'
+import { startProviderServer } from './websocket-base'
+import io from 'socket.io-client'
 
-export class MarketDataProviderBase {
+import { Socket} from 'socket.io'
+
+export abstract class MarketDataProviderBase extends EventEmitter {
+    id: string
     options: ProviderOptions
     mode: Mode
     client: any
     isActive: boolean = false
     activeSymbols: string[] = []
-    marketSocket: any
-
-
+    socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
+    socketServer: any
+    
     constructor(options: ProviderOptions, mode: Mode, client: any) {
+        super()
+        this.id = options.id
         this.options = options
         this.mode = mode
         this.client = client
@@ -87,7 +95,7 @@ export class MarketDataProviderBase {
      * Run processes prior to closing down the market data provider
      */
     async finalize(): Promise<null> {
-        return this.marketSocket()
+        return this.socketClient()
     }
 
     /**
@@ -110,6 +118,20 @@ export class MarketDataProviderBase {
     }
 
     /**
+     * generic emitter that will either send to a websocket or local based on setup
+     * @param event event that is being sent out
+     * @param data data that goes with the event
+     */
+    emitter(event: string, data: any) {
+        if (this.socketServer) {
+            console.log(`sending ${event} event to socket server`)
+            this.socketServer.emit(event, data)
+        } else {
+            this.emit(event, data)
+        }        
+    }
+
+    /**
        * Converts broker specific bar/candlestick to platform specific
        * @param brokerBar the broker bar to convert
        */
@@ -125,8 +147,33 @@ export class MarketDataProviderBase {
      * Open socket to live bar data
      * @param options options for requesting bars from a websocket
      */
-    getLiveBarData(options: LiveBarOptions): void { }
+    async getLiveBarData(options: LiveBarOptions): Promise<void> {}
 
-    // TODO: getLiveTradeData()
-    // TODO: getLiveOrderBookData()
+    async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {}
+
+    startSocketServer() {
+        this.socketServer = startProviderServer()
+        this.socketServer.on("connect", (socket: Socket) => {
+            console.log(`new connection,id=${socket.id}`)
+        })
+        this.socketServer.on("message", (message: any) => {
+            console.log(`received message ${message}`)
+        })
+    }
+
+    stopSocketServer() {
+        this.socketServer.close()
+    }
+
+    async startSocketListener() {
+        this.socketClient = io('http://localhost:3000')
+        this.socketClient.onAny((event: any, ...args: any) => {
+            this.emit(event, ...args)
+        })
+    }
+
+    stopSocketListener() {
+        this.socketClient.close()
+    }
+
 }

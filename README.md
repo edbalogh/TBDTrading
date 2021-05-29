@@ -9,6 +9,7 @@ Custom strategies will be created (eventually in the web application) that can c
 ## installation
 npm install
 copy config.dist.ts to config.ts and update keys
+npm link
 
 
 ## contributing
