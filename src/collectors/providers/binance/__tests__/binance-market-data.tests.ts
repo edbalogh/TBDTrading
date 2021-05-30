@@ -22,6 +22,13 @@ afterEach(() => {
     Events.removeAllListeners();
 });
 
+describe('BiannceMarketData Parameter Details tests', () => {
+    const details = BinanceMarketData.parameterDetails()
+    expect(details.interval).toBeDefined
+    expect(details.interval.templateOptions.options.length).toBe(15)
+    expect(details.limit.templateOptions.max).toBe(1000)
+})
+
 describe("BinanceMarketData Historical Bar tests", () => {   
 
     test('should translate historical bars', () => {
@@ -45,7 +52,8 @@ describe("BinanceMarketData Historical Bar tests", () => {
         expect(histBar2.inProgress).toBe(true)
     })
 
-    test('should get historical bar data', async () => {
+    test('should get historical bar data with one call per symbol', async () => {
+        let time = new Date('2021-01-31').getTime() - 1
         const bars: Bar[] = []
         bmd.on('ADAUSDT.bar', (x: any) => bars.push(x))
         bmd.on('ONEUSDT.bar', (x: any) => bars.push(x))
@@ -53,8 +61,8 @@ describe("BinanceMarketData Historical Bar tests", () => {
         bmd.client.candles = jest.fn()
             .mockResolvedValueOnce([ buildHistoricalBar() ])
             .mockResolvedValueOnce([
-                buildHistoricalBar({ openTime: currTime - 2000, closeTime: currTime - 1001}),
-                buildHistoricalBar({ openTime: currTime - 1000, closeTime: currTime - 1})
+                buildHistoricalBar({ openTime: time += 1, closeTime: time += 59999 }),
+                buildHistoricalBar({ openTime: time += 1, closeTime: time += 59999 })
             ])
 
         await bmd.getHistoricalBarData({ timeframe: '1m', symbols: ['ADAUSDT', 'ONEUSDT'] })
@@ -62,6 +70,26 @@ describe("BinanceMarketData Historical Bar tests", () => {
         expect(bars.filter(x => x.symbol === 'ADAUSDT')).toHaveLength(1)
         expect(bars.filter(x => x.symbol === 'ONEUSDT')).toHaveLength(2)
         expect(bmd.client.candles).toHaveBeenCalledTimes(2)
+    })
+
+    test('should make multiple calls when request is larger than 1000', async () => {
+        let time = new Date('2021-01-31').getTime() - 1
+        const bars: Bar[] = []
+        bmd.on('ADAUSDT.bar', (x: any) => bars.push(x))
+        let batch1 = []
+        let batch2 = []
+        let batch3 = []
+        for(let i=0;i<1000;i++) batch1.push(buildHistoricalBar({ openTime: time += 1, closeTime: time += 59999 }))
+        for(let i=0;i<1000;i++) batch2.push(buildHistoricalBar({ openTime: time += 1, closeTime: time += 59999 }))
+        for(let i=0;i<1;i++) batch3.push(buildHistoricalBar({ openTime: time += 1, closeTime: time += 59999 }))
+        bmd.client.candles = jest.fn()
+            .mockResolvedValueOnce(batch1)
+            .mockResolvedValueOnce(batch2)
+            .mockResolvedValueOnce(batch3)
+        await bmd.getHistoricalBarData({ timeframe: '1m', symbols: ['ADAUSDT'], limit: 2001 })
+        expect(bmd.client.candles).toHaveBeenCalledTimes(3)
+        expect(bars).toHaveLength(2001)
+        expect(bars.filter(x => x.symbol === 'ADAUSDT')).toHaveLength(2001)
     })
 
     test('should translate historical bar options', () => {        

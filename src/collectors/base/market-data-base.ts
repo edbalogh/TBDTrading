@@ -56,7 +56,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
                     description: 'Number of Bars to Pull for Testing',
                     required: false,
                     min: 1,
-                    max: 1000
+                    max: 5000
                 }
             },
             afterDate: {
@@ -173,5 +173,4 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     stopSocketListener() {
         this.socketClient.close()
     }
-
 }

@@ -5,9 +5,10 @@ import { OrderBook, BookLevel } from '../../base/models/order-book'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
 import { ProviderOptions } from '../../base/models/provider-options'
 import { last } from 'lodash'
-import config from '../../../../config'
 import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions } from '../../base/models/options'
 import { CandlesOptions, CandleChartInterval, Candle, CandleChartResult, Depth } from 'binance-api-node'
+
+
 const Binance = require('binance-api-node').default
 
 const utils = require('../../../utils/legacy.js')  // TODO: deprecate the legacy utils
@@ -19,9 +20,8 @@ export class BinanceMarketData extends MarketDataProviderBase {
         super(options, mode, client)
     }
 
-    parameterDetails() {
-        const details = MarketDataProviderBase.parameterDetails();
-        // override the interval options
+    static parameterDetails() {
+        const details = {...MarketDataProviderBase.parameterDetails() }
         details.interval.templateOptions.options = [
             { value: '1m', label: '1 Minute' },
             { value: '3m', label: '3 Minute' },
@@ -39,7 +39,6 @@ export class BinanceMarketData extends MarketDataProviderBase {
             { value: '1w', label: '1 Week' },
             { value: '1M', label: '1 Month' }
         ]
-        // override the max limit
         details.limit.templateOptions.max = 1000
         return details
     }
@@ -53,7 +52,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
      */
     _commonBarTranslations(brokerBar: Candle | CandleChartResult): Partial<Bar> {
         const bar: Partial<Bar> = {}
-        bar.providerId = this.options.id            
+        bar.providerId = this.options.id
         bar.open = Number(brokerBar.open)
         bar.close = Number(brokerBar.close)
         bar.high = Number(brokerBar.high)
@@ -91,8 +90,8 @@ export class BinanceMarketData extends MarketDataProviderBase {
         bar.start = barEpochTimeToUTC(brokerBar.startTime)
         bar.end = barEpochTimeToUTC(brokerBar.closeTime)
         bar.symbol = brokerBar.symbol,
-        bar.timeframe = brokerBar.interval,
-        bar.inProgress = !brokerBar.isFinal         
+            bar.timeframe = brokerBar.interval,
+            bar.inProgress = !brokerBar.isFinal
         return <Bar>bar;
     }
 
@@ -108,18 +107,18 @@ export class BinanceMarketData extends MarketDataProviderBase {
         // builds a list of symbols each with a list of bars for that symbol
         await Promise.all(finalSymbols.map(async (s) => {
             finalOptions.symbol = s
-            let batch: CandleChartResult[] = await this.client.candles( { ...finalOptions })
+            let batch: CandleChartResult[] = await this.client.candles({ ...finalOptions })
             this._sendBarBatchEvents(batch, finalOptions.interval, s)
             let barCount = batch.length
 
             // banance only allows 1000 bars at a time, this will keep requesting until the entire request is made
             // TODO: implement throttling here to control number of calls made to the API
-            while (barCount === 1000 && (!finalOptions.limit || barCount < finalOptions.limit)) {
-                const updatedOptions = {...finalOptions};
+            while (batch.length === 1000 && (!finalOptions.limit || barCount < finalOptions.limit)) {
+                const updatedOptions = { ...finalOptions };
                 // change startTime to 1s after last bar receieved
                 updatedOptions.startTime = Number((last(batch) as CandleChartResult).openTime) + 1000
                 updatedOptions.symbol = s
-                batch = await this.client.candles( { ...updatedOptions });
+                batch = await this.client.candles({ ...updatedOptions });
                 this._sendBarBatchEvents(batch, finalOptions.interval, s)
                 barCount += batch.length;
             }
@@ -129,8 +128,8 @@ export class BinanceMarketData extends MarketDataProviderBase {
     }
 
     _sendBarBatchEvents(bars: any, interval: string, symbol: string): void {
-        bars.filter((b:any) => b && b.openTime && b.openTime > 0).forEach((b:any) => {
-            this.emitter(`${symbol}.bar`, this.translateHistoricalBar(b, interval, symbol))
+        bars.filter((b: any) => b && b.openTime && b.openTime > 0).forEach((b: any) => {
+            this.emitter(`${symbol}.bar`, this.translateHistoricalBar(b, interval, symbol)) // TODO: consider moving the emit to the base class to make provider more generic
         })
     }
 
@@ -141,7 +140,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
     translateHistoricalBarOptions(options: HistoricalBarOptions): CandlesOptions {
         let finalOptions: Partial<CandlesOptions> = {};
 
-        finalOptions.interval = <CandleChartInterval> options.timeframe || '1h'
+        finalOptions.interval = <CandleChartInterval>options.timeframe || '1h'
 
         if (options.startDate || options.afterDate) {
             finalOptions.startTime = new Date(options.startDate || options.afterDate || 0).getTime();
@@ -151,9 +150,9 @@ export class BinanceMarketData extends MarketDataProviderBase {
         // carry over the limit if it's provided (uses binance default if not specified)
         if (options.limit) finalOptions.limit = options.limit
 
-        return <CandlesOptions> finalOptions;
+        return <CandlesOptions>finalOptions;
     }
-    
+
 
     /**
      * Starts streaming live bar data from binance
@@ -161,7 +160,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
      */
     async getLiveBarData(options: LiveBarOptions): Promise<void> {
         this.socketClient = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
-            switch (event.eventType) {                
+            switch (event.eventType) {
                 case 'kline':
                     const bar: Bar = this.translateLiveBar(event)
                     if (options.showActive || !bar.inProgress) this.emitter(`${bar.symbol}.bar`, bar)
@@ -176,7 +175,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
 
 
     // OrderBook translations
-    
+
     /**
      * Translate live order book data from binance to platform order book
      * @param depth order book depth data from binance
@@ -187,20 +186,19 @@ export class BinanceMarketData extends MarketDataProviderBase {
         book.source = 'live'
         book.symbol = depth.symbol
         book.eventTime = new Date(depth.eventTime)
-        book.bids = depth.bidDepth.filter(b => Number(b.quantity) > 0).map(b => <BookLevel> {price: Number(b.price), quantity: Number(b.quantity)})
-        book.asks = depth.askDepth.filter(a => Number(a.quantity) > 0).map(a => <BookLevel> {price: Number(a.price), quantity: Number(a.quantity)})
-        return <OrderBook> book
+        book.bids = depth.bidDepth.filter(b => Number(b.quantity) > 0).map(b => <BookLevel>{ price: Number(b.price), quantity: Number(b.quantity) })
+        book.asks = depth.askDepth.filter(a => Number(a.quantity) > 0).map(a => <BookLevel>{ price: Number(a.price), quantity: Number(a.quantity) })
+        return <OrderBook>book
     }
 
     async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {
-        this.socketClient = this.client.ws.depth(options.symbols, (event:Depth) => {
+        this.socketClient = this.client.ws.depth(options.symbols, (event: Depth) => {
             switch (event.eventType) {
                 case 'depthUpdate':
-                    console.log(event)
                     const book = this.translateLiveOrderBook(event)
                     if (book.bids.length > 0 && book.asks.length > 0) {
                         this.emitter(`${book.symbol}.book`, book)
-                    } 
+                    }
                     break;
                 default:
                     console.log(`untracked websocket event`)
