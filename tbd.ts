@@ -4,25 +4,57 @@ import { OrderBook } from './src/collectors/base/models/order-book';
 import yargs, { Argv } from 'yargs'
 import { ProviderOptions } from './src/collectors/base/models/provider-options'
 import config from './config'
+const BinanceMarketData = require('./src/collectors/providers/binance/binance-market-data')
+import { Execution } from './src/strategies/base/models/strategy-options';
 
-import { BinanceMarketData } from './src/collectors/providers/binance/binance-market-data'
 
 yargs
     .command('demo', 'Run the live streaming bar demo', (yargs: Argv) => {
-        const options = yargs.option("type", {
-            describe: "Demo Type",
-            alias: "t",
-            default: "live-bar"
+        const options = yargs.option('type', {
+            describe: 'Demo Type',
+            alias: 't',
+            default: 'live-bar'
         })
         return demo(options.argv.type)
     })
     .command('wsServer', 'Start a WebSocket Server', (yargs: Argv) => {
         return wsServer(yargs)
     })
-    .command('wsListener', 'Start WebSocket Listener', (yars: Argv) => {
+    .command('wsListener', 'Start WebSocket Listener', (yargs: Argv) => {
         return wsClient(yargs)
     })
+    .command('execution', 'Start Execution', (yargs: Argv) => {
+        return executeStrategy(yargs)
+    })
     .argv;
+
+function executeStrategy(yargs: Argv) {
+    const BasicArbitrage = require('./src/strategies/examples/basic-arbitrage')
+    const execution: Execution = {
+        id: '1',
+        name: 'canary',
+        strategyId: 'basic-arb',
+        mode: 'LIVE',
+        baseCurrency: 'USD',
+        symbols: [
+            { symbol: 'ADAUSDT', status: 'PENDING', reference: false, providerId: 'binance' },
+            { symbol: 'ADAUSD', status: 'PENDING', reference: true, providerId: 'binance' }
+        ],
+        status: 'PENDING',
+        providers: [{ providerId: 'binance' }]
+    }
+
+    const bot = new BasicArbitrage(execution, execution.symbols[0])
+    bot.startup()
+    // try {
+    //     bot.startup()
+    // } catch {
+    //     console.log('ending')
+    // } finally {
+    //     bot.shutdown()
+    // }
+    return
+}
 
 function wsServer(yargs: Argv) {
     const options = yargs.option('symbols', {
@@ -39,7 +71,7 @@ function wsServer(yargs: Argv) {
         }).argv
 
     const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)
+    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
     binance.startSocketServer()
 
@@ -49,7 +81,7 @@ function wsServer(yargs: Argv) {
         process.exit();
     });
 
-    binance.getLiveOrderBook({symbols})
+    binance.getLiveOrderBook({ symbols })
 }
 
 async function wsClient(yargs: Argv) {
@@ -67,13 +99,13 @@ async function wsClient(yargs: Argv) {
         }).argv
 
     const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
-    
+
     symbols.forEach(s => {
         binance.on(`${s}.book`, (e: any) => console.log(e))
     })
-    
+
     process.on('SIGINT', function () {
         console.log("Caught interrupt signal, closing socket");
         binance.stopSocketListener()
@@ -123,10 +155,10 @@ function liveBarDemo() {
         }).argv
 
     const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
     symbols.forEach(s => {
-        binance.on(`${s}.bar`, (book) => console.log(book))
+        binance.on(`${s}.bar`, (book: OrderBook) => console.log(book))
     })
 
     process.on('SIGINT', function () {
@@ -173,10 +205,10 @@ function historicalBarDemo() {
         }).argv
 
     const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
     symbols.forEach(s => {
-        binance.on(`${s}.bar`, (book) => console.log(book))
+        binance.on(`${s}.bar`, (book: OrderBook) => console.log(book))
     })
 
     process.on('SIGINT', function () {
@@ -196,19 +228,19 @@ function liveOrderBookDemo() {
         default: "ADAUSDT,DOGEUSDT",
         type: "string"
     })
-    .options('providerId', {
-        describe: 'providerId',
-        alias: 'i',
-        default: 'binance',
-        type: 'string'
-    }).argv
+        .options('providerId', {
+            describe: 'providerId',
+            alias: 'i',
+            default: 'binance',
+            type: 'string'
+        }).argv
 
     const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
 
     symbols.forEach(s => {
-        binance.on(`${s}.book`, (book) => console.log(book))
+        binance.on(`${s}.book`, (book: OrderBook) => console.log(book))
     })
 
     process.on('SIGINT', function () {
@@ -242,16 +274,16 @@ function basicArbitrageDemo() {
         }).argv
 
     const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any> config.providers.find(p => p.id === options.providerId)    
+    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
     const latestBook: Map<string, OrderBook> = new Map()
-   
+
     let total = 0.0
     let tradeCount = 0
     let noFeeTotal = 0
-    
+
     symbols.forEach(s => {
-        binance.on(`${s}.book`, (book) => {
+        binance.on(`${s}.book`, (book: OrderBook) => {
             bookListener(book)
         })
     })
@@ -298,7 +330,7 @@ function basicArbitrageDemo() {
         if (opportunity - fees < 0) {
             console.log(`unprofitable opportunity at ${eventTime}`)
             console.log(
-                { 
+                {
                     buySymbol: buyBook.symbol, sellSymbol: sellBook.symbol, opportunity, fees, shares, buyPrice: buyBook.asks[0].price,
                     sellPrice: sellBook.bids[0].price, diff: sellBook.bids[0].price - buyBook.asks[0].price, noFeeTotal, total, tradeCount
                 }

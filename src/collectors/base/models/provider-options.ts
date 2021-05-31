@@ -1,12 +1,59 @@
-export type ProviderType = 'Broker' | 'MarketData' | 'Other'
-export type BotMode = 'LIVE' | 'PAPER' | 'BACKTEST'
+import { Mode } from '../../../constants/types'
 
+export type ProviderType = 'Broker' | 'MarketData' | 'Other'
+export type ConnectionStatus = 'PENDING' | 'DISCONNECTED' | 'CONNECTED' | 'RECONNECTING' | 'ERROR' | 'ACTIVE'
+
+export interface StatusEntry {
+    time: Date,
+    status: ConnectionStatus,
+    details?: string
+}
+
+/**
+ * Provider represents an instance of a Provider service and is created when Provider services
+ * are started
+ */
+export interface ProviderService {
+    providerId: string,
+    instanceId?: string,
+    providerType?: ProviderType,
+    status?: ConnectionStatus,
+    mode?: Mode,
+    startTime?: Date,
+    statusLog?: StatusEntry[],
+    endTime?: Date
+}
+
+/**
+ * Connection represents the instance of a connection (or subscription) to a provider service
+ */
+export interface Connection {
+    instanceId: string,
+    providerId: string,
+    providerInstanceId: string,
+    providerType: ProviderType,
+    status: ConnectionStatus,
+    startTime: Date
+    lastMessageTime?: Date
+    statusLog?: StatusEntry[]
+    endTime?: Date
+}
+
+/**
+ * ProviderOptions includes user specific connection details pulled from the config.ts for each 
+ * provider supported.  This includes api connection information as well as configuration settings
+ * for starting/subscribing to streamed services
+ */
+export interface ProviderScript {
+    type: ProviderType,
+    location: string
+}
 export interface ProviderOptions {
     id: string
     name: string,
-    modes: BotMode[],
-    providerTypes: ProviderType[],
-    apiOptions: Map<string, any>
+    supportedModes: Mode[],
+    scriptLocations: ProviderScript[],
+    apiOptions: any,
     webSocketOptions?: WebSocketOptions,
     kinesisOptions?: KinesisOptions
 }

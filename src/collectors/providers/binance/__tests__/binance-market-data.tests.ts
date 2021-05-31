@@ -10,7 +10,7 @@ const Events = new EventEmitter()
 
 let bmd: any = {};
 let defaultOptions: ProviderOptions = {
-    id: 'test', providerTypes: ['MarketData'], name: 'test', modes: ['BACKTEST'], apiOptions: new Map()
+    id: 'test', scriptLocations: [{ type: 'MarketData', location: ''}], name: 'test', supportedModes: ['BACKTEST'], apiOptions: new Map()
 }
 
 beforeEach(() => {

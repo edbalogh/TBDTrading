@@ -1,10 +1,11 @@
-import { ProviderOptions } from './models/provider-options'
+import { ProviderService, ProviderOptions } from './models/provider-options'
 import { Mode } from '../../constants/types'
 import { indexOf } from 'lodash'
 import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions } from './models/options'
 import { EventEmitter } from 'events'
 import { startProviderServer } from './websocket-base'
 import io from 'socket.io-client'
+import { v4 as uuid } from 'uuid'
 
 import { Socket} from 'socket.io'
 
@@ -17,15 +18,24 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     activeSymbols: string[] = []
     socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
     socketServer: any
+    providerService: ProviderService
     
     constructor(options: ProviderOptions, mode: Mode, client: any) {
         super()
-        if (!options.modes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
-        if (!options.providerTypes.includes('MarketData')) throw new Error(`Provider ${options.id} does not support providerType 'MarketData'`)
+        if (!options.supportedModes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
+        if (!options.scriptLocations.find(s => s.type === 'MarketData')) throw new Error(`Provider ${options.id} does not support providerType 'MarketData'`)
         this.id = options.id
         this.options = options
         this.mode = mode
         this.client = client
+
+        this.providerService = {
+            instanceId: uuid(),
+            providerId: this.id,
+            providerType: 'MarketData',
+            status: 'PENDING',
+            mode: this.mode
+        }
     }
 
     /**
@@ -89,14 +99,14 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     /**
      * Run processes to setup the market data provider
      */
-    async initialize(): Promise<boolean> {
+    async startup(): Promise<boolean> {
         return this.healthCheck();
     }
 
     /**
      * Run processes prior to closing down the market data provider
      */
-    async finalize(): Promise<null> {
+    async shutdown(): Promise<null> {
         return this.socketClient()
     }
 
@@ -150,9 +160,15 @@ export abstract class MarketDataProviderBase extends EventEmitter {
 
     startSocketServer() {
         this.socketServer = startProviderServer(this.options)
+        this.providerService.startTime = new Date()
+        this.providerService.status = 'ACTIVE'
+
+        
         this.socketServer.on("connect", (socket: Socket) => {
             console.log(`new connection,id=${socket.id}`)
+            this.socketServer.to(socket.id).emit('initialize', this.providerService?.instanceId)
         })
+
         this.socketServer.on("message", (message: any) => {
             console.log(`received message ${message}`)
         })
@@ -164,7 +180,8 @@ export abstract class MarketDataProviderBase extends EventEmitter {
 
     async startSocketListener() {
         const port = this.options.webSocketOptions ? this.options.webSocketOptions.port : 3000
-        this.socketClient = io(`http://localhost:${port}`)
+        const url = this.options.webSocketOptions && this.options.webSocketOptions.url ? this.options.webSocketOptions.url : 'http://localhost'
+        this.socketClient = io(`${url}:${port}`)
         this.socketClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)
         })

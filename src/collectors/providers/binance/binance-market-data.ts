@@ -211,3 +211,5 @@ export class BinanceMarketData extends MarketDataProviderBase {
         this.socketClient();
     }
 }
+
+module.exports = BinanceMarketData
