@@ -1,13 +1,12 @@
-import { ProviderService, ProviderOptions } from './models/provider-options'
+import { ProviderOptions } from './models/provider-options'
 import { Mode } from '../../constants/types'
 import { indexOf } from 'lodash'
-import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions } from './models/options'
+import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from './models/options'
 import { EventEmitter } from 'events'
-import { startProviderServer } from './websocket-base'
+import { MarketDataSocketServer, RequestType } from './sockets/market-data-socket'
 import io from 'socket.io-client'
-import { v4 as uuid } from 'uuid'
 
-import { Socket} from 'socket.io'
+
 
 export abstract class MarketDataProviderBase extends EventEmitter {
     id: string
@@ -17,8 +16,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     isActive: boolean = false
     activeSymbols: string[] = []
     socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
-    socketServer: any
-    providerService: ProviderService
+    providerServer?: MarketDataSocketServer
     
     constructor(options: ProviderOptions, mode: Mode, client: any) {
         super()
@@ -28,14 +26,6 @@ export abstract class MarketDataProviderBase extends EventEmitter {
         this.options = options
         this.mode = mode
         this.client = client
-
-        this.providerService = {
-            instanceId: uuid(),
-            providerId: this.id,
-            providerType: 'MarketData',
-            status: 'PENDING',
-            mode: this.mode
-        }
     }
 
     /**
@@ -135,14 +125,14 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * @param data data that goes with the event
      */
     emitter(event: string, data: any) {
-        this.socketServer ? this.socketServer.emit(event, data) : this.emit(event, data)
+        this.providerServer ? this.providerServer.socketServer?.emit(event, data) : this.emit(event, data)
     }
 
     /**
        * Converts broker specific bar/candlestick to platform specific
        * @param brokerBar the broker bar to convert
        */
-    translateBar(brokerBar: any): void { }
+    translateBar(brokerBar: any): void {}
 
     /**
      * Pull historical bar data from API returning as a list of lists (Bar[symbol][bars])
@@ -151,32 +141,66 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     getHistoricalBarData(options: HistoricalBarOptions): void { }
 
     /**
-     * Open socket to live bar data
+     * Open socket and/or add subscriptions for live bar data
      * @param options options for requesting bars from a websocket
      */
-    async getLiveBarData(options: LiveBarOptions): Promise<void> {}
+    async getLiveBarData(options: LiveBarOptions): Promise<void> {
+        this.socketClient.send('addBarSubscription', options)
+    }
 
-    async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {}
+    /**
+     * Open socket and/or add subscriptions for live bar data
+     * @param options options for requesting live order book data
+     */
+    async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {
+        this.socketClient.send('addBookSubscription', options)
+    }
+
+
+
+    serverRunning(): boolean {
+        return true
+    }
 
     startSocketServer() {
-        this.socketServer = startProviderServer(this.options)
-        this.providerService.startTime = new Date()
-        this.providerService.status = 'ACTIVE'
+        this.providerServer = new MarketDataSocketServer(this.options, this.mode)
+        this.providerServer.startServer()
 
-        
-        this.socketServer.on("connect", (socket: Socket) => {
-            console.log(`new connection,id=${socket.id}`)
-            this.socketServer.to(socket.id).emit('initialize', this.providerService?.instanceId)
-        })
 
-        this.socketServer.on("message", (message: any) => {
-            console.log(`received message ${message}`)
-        })
+        // register the Provider specific method to be called when a new subsription is requested
+        const eventCallbacks: Map<RequestType, Function> = new Map()
+        eventCallbacks.set('addBarSubscriptions', this.addServerBarSubscription)
+        eventCallbacks.set('addBookSubscriptions', this.addServerBookSubscription)
+        eventCallbacks.set('addTradeSubscriptions', this.addServerTradeSubscription)
+
+        this.providerServer.registerEvents(eventCallbacks)
+    }
+
+    // implement on provider class, registers for a new bar
+    async addProviderBarSubscriptions(options: LiveBarOptions): Promise<any> {}
+
+    // method to add the bar subscription to the local server
+    addServerBarSubscription(options: LiveBarOptions) {
+        this.addProviderBarSubscriptions(options)    
+    }
+
+    async addProviderBookSubscriptions(options: LiveOrderBookOptions): Promise<any> {}
+
+    addServerBookSubscription(options: LiveOrderBookOptions) {
+        this.addProviderBookSubscriptions(options)    
+    }
+
+    async addProviderTradeSubscriptions(options: LiveTradeOptions): Promise<any> {}
+
+    addServerTradeSubscription(options: LiveBarOptions) {
+        this.addProviderTradeSubscriptions(options)    
     }
 
     stopSocketServer() {
-        this.socketServer.close()
+        this.providerServer?.close()
     }
+
+
 
     async startSocketListener() {
         const port = this.options.webSocketOptions ? this.options.webSocketOptions.port : 3000

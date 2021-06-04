@@ -17,3 +17,7 @@ export interface LiveBarOptions {
 export interface LiveOrderBookOptions {
     symbols: string[]
 }
+
+export interface LiveTradeOptions {
+    symbols: string[]
+}
