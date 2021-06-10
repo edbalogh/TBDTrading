@@ -4,6 +4,7 @@ import http from 'http'
 import {Server, Socket} from 'socket.io'
 import { ProviderOptions, ProviderType } from '../models/provider-options'
 import { v4 as uuid } from 'uuid'
+import { isEqual } from 'lodash'
 import { Mode } from '../../../constants/types'
 
 export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'ORDER'
@@ -59,20 +60,23 @@ export class WebSocketServerBase {
             }
         })
     }
-
-    addConnectionToActiveSubscription(connectionId: string, type: SubscriptionType, options: any) {
-        console.log(`adding connection ${connectionId} to type ${type}`)
-
-        // TODO: this is not finding the match when a 2nd connection asks for the same symbol
-        const subscriptionDetails = this.findSubscriptionDetails(type, options)
-        subscriptionDetails.connections.push(connectionId)
-        console.log(this.activeSubscriptions)
+    
+    addSubscription(connectionId: string, type: SubscriptionType, options: any) {
+        if (this.subscriptionExists(type, options)) {
+            console.log(`adding new connection ${connectionId} to existing type ${type}`)
+            const subscriptionDetails = this.findSubscriptionDetails(type, options)
+            if (!subscriptionDetails.connections.includes(connectionId)) subscriptionDetails.connections.push(connectionId)
+        } else {
+            console.log(`adding new subscription type ${type} with connection ${connectionId}`)
+            this.activeSubscriptions.push({type, options, connections: [connectionId]})
+        }
     }
 
     removeConnectionFromActiveSubscriptions(connectionId: string, type: SubscriptionType, options: any) {
         console.log(`removing connection ${connectionId} from type ${type}`)
         const subscriptionDetails = this.findSubscriptionDetails(type, options)
         subscriptionDetails.connections = subscriptionDetails.connections.filter( (c: string) => c !== connectionId)
+        this.cleanActiveSubscriptions()
     }
 
     removeConnectionFromAllSubscriptions(connectionId: string) {
@@ -80,23 +84,23 @@ export class WebSocketServerBase {
         this.activeSubscriptions.forEach( (s: any) => {
             if(s.connections.includes(connectionId)) this.removeConnectionFromActiveSubscriptions(connectionId, s.type, s.options)
         })
+        this.cleanActiveSubscriptions()
     }
 
     subscriptionExists(type: SubscriptionType, options: any) {
-        return this.activeSubscriptions.filter( (s:any) => s.type === type && s.options === options).length > 0
+        return this.activeSubscriptions.filter( (s:any) => {
+            return s.type === type && isEqual(s.options, options)
+        }).length > 0
+    }
+
+    cleanActiveSubscriptions() {
+        this.activeSubscriptions = this.activeSubscriptions.filter(a => a.connections.length > 0)
     }
 
     findSubscriptionDetails(type: SubscriptionType, options: any): any {
-        let sub = this.activeSubscriptions.find( (a: any) => {
-            a.type === type && a.options === options
+        return this.activeSubscriptions.find( (a: any) => {
+            return a.type === type && isEqual(a.options, options)
         })
-
-        if (!sub) {
-            sub = {type, options, connections: []}
-            this.activeSubscriptions.push(sub)
-        }
-
-        return sub
     }
 
     close() {

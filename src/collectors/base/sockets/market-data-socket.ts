@@ -51,11 +51,9 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         if (!cb) throw new Error('no callback found for addBarSubscriptions event')
         const newSymbols: string[] = []
         options.symbols.map(s => {
-            if (this.subscriptionExists('BAR', { symbols: s, timeframe: options.timeframe })) {
-                this.addConnectionToActiveSubscription(connectionId, 'BAR', { symbol: s, timeframe: options.timeframe })
-            } else {
-                newSymbols.push(s)
-            }
+            const subOptions = { symbols: s, timeframe: options.timeframe }
+            if (!this.subscriptionExists('BAR', subOptions)) newSymbols.push(s)
+            this.addSubscription(connectionId, 'BAR', subOptions)
         })
 
         if (newSymbols.length > 0) {
@@ -68,12 +66,11 @@ export class MarketDataSocketServer extends WebSocketServerBase {
     handleBookSubscriptionRequest(connectionId: string, options: LiveOrderBookOptions, cb?: Function) {
         if (!cb) throw new Error('no callback found for addBookSubscriptions event')
         const newSymbols: string[] = []
+        
         options.symbols.forEach(s => {
-            if (this.subscriptionExists('BOOK', { symbols: s })) {
-                this.addConnectionToActiveSubscription(connectionId, 'BOOK', { symbol: s })
-            } else {
-                newSymbols.push(s)
-            }
+            const subOptions = { symbol: s }
+            if (!this.subscriptionExists('BOOK', subOptions)) newSymbols.push(s)
+            this.addSubscription(connectionId, 'BOOK', subOptions)
         })
 
         if (newSymbols.length > 0) {
@@ -87,11 +84,9 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         if (!cb) throw new Error('no callback found for addTradeSubscriptions event')
         const newSymbols: string[] = []
         options.symbols.map(s => {
-            if (this.subscriptionExists('TRADE', { symbols: s })) {
-                this.addConnectionToActiveSubscription(connectionId, 'TRADE', { symbol: s })
-            } else {
-                newSymbols.push(s)
-            }
+            const subOptions = { symbol: s }
+            if (!this.subscriptionExists('TRADE', subOptions)) newSymbols.push(s)
+            this.addSubscription(connectionId, 'TRADE', subOptions)
         })
 
         if (newSymbols.length > 0) {
