@@ -50,43 +50,53 @@ export class WebSocketServerBase {
             })
         })
 
-        this.socketServer.on("status", () => {
-            this.socketServer?.emit("ServerStatus", {
-                providerId: this.providerId, type: 'WebSocket', status: this.status,
-                connections: this.connections.length, activeSubscriptions: this.activeSubscriptions
-            })
+        this.socketServer.on("message", (type: any) => {
+            if (type === 'status') {
+                this.socketServer?.emit("ServerStatus", {
+                    providerId: this.providerId, type: 'WebSocket', status: this.status,
+                    connections: this.connections.length, activeSubscriptions: this.activeSubscriptions
+                })
+            }
         })
     }
 
     addConnectionToActiveSubscription(connectionId: string, type: SubscriptionType, options: any) {
+        console.log(`adding connection ${connectionId} to type ${type}`)
+
+        // TODO: this is not finding the match when a 2nd connection asks for the same symbol
         const subscriptionDetails = this.findSubscriptionDetails(type, options)
         subscriptionDetails.connections.push(connectionId)
+        console.log(this.activeSubscriptions)
     }
 
     removeConnectionFromActiveSubscriptions(connectionId: string, type: SubscriptionType, options: any) {
+        console.log(`removing connection ${connectionId} from type ${type}`)
         const subscriptionDetails = this.findSubscriptionDetails(type, options)
         subscriptionDetails.connections = subscriptionDetails.connections.filter( (c: string) => c !== connectionId)
     }
 
     removeConnectionFromAllSubscriptions(connectionId: string) {
+        console.log('remove connection from all subscriptions initiated')
         this.activeSubscriptions.forEach( (s: any) => {
             if(s.connections.includes(connectionId)) this.removeConnectionFromActiveSubscriptions(connectionId, s.type, s.options)
         })
     }
 
     subscriptionExists(type: SubscriptionType, options: any) {
-        return this.activeSubscriptions.filter( (s:any) => s.type === type && s.options === options)
+        return this.activeSubscriptions.filter( (s:any) => s.type === type && s.options === options).length > 0
     }
 
     findSubscriptionDetails(type: SubscriptionType, options: any): any {
-        return this.activeSubscriptions.find( (a: any) => {
+        let sub = this.activeSubscriptions.find( (a: any) => {
             a.type === type && a.options === options
         })
-    }
 
-    addSubscription(type: SubscriptionType, options: any) {
-        if(this.subscriptionExists(type, options)) return
-        this.activeSubscriptions.push({type, options})
+        if (!sub) {
+            sub = {type, options, connections: []}
+            this.activeSubscriptions.push(sub)
+        }
+
+        return sub
     }
 
     close() {

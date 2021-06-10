@@ -4,7 +4,7 @@ import { Mode } from '../../../constants/types'
 import { Socket } from 'socket.io'
 import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../models/options'
 
-export type RequestType = 'addBarSubscriptions' | 'addTradeSubscriptions' | 'addBookSubscriptions'
+export type RequestType = 'addBarSubscriptions' | 'addTradeSubscriptions' | 'addBookSubscriptions' | 'removeBarSubscription' | 'removeBookSubscription' | 'removeTradeSubscription'
 
 export class MarketDataSocketServer extends WebSocketServerBase {
     constructor(options: ProviderOptions, mode: Mode) {
@@ -12,24 +12,37 @@ export class MarketDataSocketServer extends WebSocketServerBase {
     }
 
     registerEvents(eventCallBacks: Map<RequestType, Function>) {
+
+        console.log('registering events')
+
         this.socketServer?.on('connect', (socket: Socket) => {
+            console.log(`socketServerConnect,socket=${socket}`)
             // return the instanceId to the listener
-            socket.to(socket.id).emit('initialize', { instanceId: this.instanceId })
+            socket.emit('initialize', { instanceId: this.instanceId })
             socket.on('disconnect', (reason: string) => {
                 this.removeConnectionFromAllSubscriptions(socket.id)
-                // TODO: if connections for that subscription is empty, unsubscribe
+
+                // remove subscriptions with no remaining connections
+                this.activeSubscriptions = this.activeSubscriptions.filter(s => s.connections.length > 0)
+                
+                // TODO: call unsubcribe method if all connections have been removed (using callbacks provided)
+
             })
 
-            socket?.on('addBarSubscriptions', (options: LiveBarOptions) => {
-                this.handleBarSubscription(socket.id, options, eventCallBacks.get('addBarSubscriptions'))
-            })
-
-            socket?.on("addBookSubscription", (options: LiveOrderBookOptions) => {
-                this.handleBookSubscription(socket.id, options, eventCallBacks.get('addBookSubscriptions'))
-            })
-
-            socket?.on("addTradeSubscription", (options: LiveTradeOptions) => {
-                this.handleTradeSubscription(socket.id, options, eventCallBacks.get('addTradeSubscriptions'))
+            socket.on('message', (requestType: RequestType, options: LiveOrderBookOptions) => {
+                       switch (requestType) {
+                    case 'addBarSubscriptions':
+                        this.handleBarSubscription(socket.id, options, eventCallBacks.get(requestType))
+                        break
+                    case 'addBookSubscriptions':
+                        this.handleBookSubscriptionRequest(socket.id, options, eventCallBacks.get(requestType))
+                        break
+                    case 'addTradeSubscriptions':
+                        this.handleTradeSubscription(socket.id, options, eventCallBacks.get(requestType))
+                        break
+                    default:
+                        console.log(`unknown market data request type ${requestType}`)
+                }
             })
         })
     }
@@ -52,10 +65,10 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         }
     }
 
-    handleBookSubscription(connectionId: string, options: LiveOrderBookOptions, cb?: Function) {
+    handleBookSubscriptionRequest(connectionId: string, options: LiveOrderBookOptions, cb?: Function) {
         if (!cb) throw new Error('no callback found for addBookSubscriptions event')
         const newSymbols: string[] = []
-        options.symbols.map(s => {
+        options.symbols.forEach(s => {
             if (this.subscriptionExists('BOOK', { symbols: s })) {
                 this.addConnectionToActiveSubscription(connectionId, 'BOOK', { symbol: s })
             } else {

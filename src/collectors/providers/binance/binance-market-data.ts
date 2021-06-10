@@ -14,7 +14,7 @@ const Binance = require('binance-api-node').default
 const utils = require('../../../utils/legacy.js')  // TODO: deprecate the legacy utils
 
 export class BinanceMarketData extends MarketDataProviderBase {
-    brokerSocket: any
+    providerSocket: any
     constructor(options: ProviderOptions, mode: Mode) {
         const client = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
         super(options, mode, client)
@@ -158,8 +158,8 @@ export class BinanceMarketData extends MarketDataProviderBase {
      * Starts streaming live bar data from binance
      * @param options platforms LiveBarOptions
      */
-    async addProviderBarSubscriptions(options: LiveBarOptions): Promise<void> {
-        this.brokerSocket = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
+    addProviderBarSubscriptions(options: LiveBarOptions): void {
+        this.providerSocket = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
             switch (event.eventType) {
                 case 'kline':
                     const bar: Bar = this.translateLiveBar(event)
@@ -190,8 +190,9 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return <OrderBook>book
     }
 
-    async addProviderBookSubscriptions(options: LiveOrderBookOptions): Promise<void> {
-        this.brokerSocket = this.client.ws.depth(options.symbols, (event: Depth) => {
+    addProviderBookSubscriptions(options: LiveOrderBookOptions): any {   
+        console.log('addProviderBookSubscriptions')     
+        this.providerSocket = this.client.ws.depth(options.symbols, (event: Depth) => {
             switch (event.eventType) {
                 case 'depthUpdate':
                     const book = this.translateLiveOrderBook(event)
@@ -207,7 +208,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
     }
 
     stopMarketDataStream() {
-        this.brokerSocket();
+        this.providerSocket();
     }
 }
 

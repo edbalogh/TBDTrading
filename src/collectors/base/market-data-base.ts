@@ -17,6 +17,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     activeSymbols: string[] = []
     socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
     providerServer?: MarketDataSocketServer
+    subscriptionHistory: any[] = []
     
     constructor(options: ProviderOptions, mode: Mode, client: any) {
         super()
@@ -144,8 +145,8 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * Open socket and/or add subscriptions for live bar data
      * @param options options for requesting bars from a websocket
      */
-    async getLiveBarData(options: LiveBarOptions): Promise<void> {
-        this.socketClient.send('addBarSubscription', options)
+    async getLiveBarData(options: LiveBarOptions): Promise<void> {        
+        this.socketClient.send('addBarSubscriptions', options)
     }
 
     /**
@@ -153,10 +154,9 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * @param options options for requesting live order book data
      */
     async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {
-        this.socketClient.send('addBookSubscription', options)
+        this.subscriptionHistory.push({topic: 'addBookSubscriptions', options})
+        this.socketClient.send('addBookSubscriptions', options)
     }
-
-
 
     serverRunning(): boolean {
         return true
@@ -169,28 +169,28 @@ export abstract class MarketDataProviderBase extends EventEmitter {
 
         // register the Provider specific method to be called when a new subsription is requested
         const eventCallbacks: Map<RequestType, Function> = new Map()
-        eventCallbacks.set('addBarSubscriptions', this.addServerBarSubscription)
-        eventCallbacks.set('addBookSubscriptions', this.addServerBookSubscription)
-        eventCallbacks.set('addTradeSubscriptions', this.addServerTradeSubscription)
+        eventCallbacks.set('addBarSubscriptions', this.addServerBarSubscription.bind(this))
+        eventCallbacks.set('addBookSubscriptions', this.addServerBookSubscription.bind(this))
+        eventCallbacks.set('addTradeSubscriptions', this.addServerTradeSubscription.bind(this))
 
         this.providerServer.registerEvents(eventCallbacks)
     }
 
     // implement on provider class, registers for a new bar
-    async addProviderBarSubscriptions(options: LiveBarOptions): Promise<any> {}
+    addProviderBarSubscriptions(options: LiveBarOptions): any {}
 
     // method to add the bar subscription to the local server
     addServerBarSubscription(options: LiveBarOptions) {
         this.addProviderBarSubscriptions(options)    
     }
 
-    async addProviderBookSubscriptions(options: LiveOrderBookOptions): Promise<any> {}
+    addProviderBookSubscriptions(options: LiveOrderBookOptions): any {}
 
     addServerBookSubscription(options: LiveOrderBookOptions) {
-        this.addProviderBookSubscriptions(options)    
+        this.addProviderBookSubscriptions(options)
     }
 
-    async addProviderTradeSubscriptions(options: LiveTradeOptions): Promise<any> {}
+    addProviderTradeSubscriptions(options: LiveTradeOptions): any {}
 
     addServerTradeSubscription(options: LiveBarOptions) {
         this.addProviderTradeSubscriptions(options)    
@@ -200,14 +200,18 @@ export abstract class MarketDataProviderBase extends EventEmitter {
         this.providerServer?.close()
     }
 
-
-
-    async startSocketListener() {
+    startSocketListener() {
         const port = this.options.webSocketOptions ? this.options.webSocketOptions.port : 3000
         const url = this.options.webSocketOptions && this.options.webSocketOptions.url ? this.options.webSocketOptions.url : 'http://localhost'
         this.socketClient = io(`${url}:${port}`)
         this.socketClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)
+        })
+
+        this.socketClient.on('connect', () => {
+            this.subscriptionHistory.forEach(h => {
+                this.socketClient.send(h.topic, h.options)
+            })
         })
     }
 

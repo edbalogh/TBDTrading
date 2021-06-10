@@ -4,12 +4,7 @@ import config from '../../config'
 const BinanceMarketData = require('../collectors/providers/binance/binance-market-data')
 
 export function wsServer(yargs: Argv) {
-    const options = yargs.option('symbols', {
-        describe: 'Symbol List (comma separated)',
-        alias: 's',
-        default: 'ADAUSDT,DOGEUSDT',
-        type: 'string'
-    })
+    const options = yargs
         .options('providerId', {
             describe: 'providerId',
             alias: 'i',
@@ -17,7 +12,6 @@ export function wsServer(yargs: Argv) {
             type: 'string'
         }).argv
 
-    const symbols = options.symbols.split(',')
     const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
     const binance = new BinanceMarketData(providerOptions, 'LIVE')
     binance.startSocketServer()
@@ -58,5 +52,5 @@ export function wsClient(yargs: Argv) {
     });
 
     binance.startSocketListener()
-    binance.getLiveOrderBook(providerOptions)
+    binance.getLiveOrderBook({symbols})
 }
