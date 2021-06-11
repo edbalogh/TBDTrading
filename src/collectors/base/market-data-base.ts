@@ -145,7 +145,8 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * Open socket and/or add subscriptions for live bar data
      * @param options options for requesting bars from a websocket
      */
-    async getLiveBarData(options: LiveBarOptions): Promise<void> {        
+    async getLiveBarData(options: LiveBarOptions): Promise<void> {
+        this.subscriptionHistory.push({topic: 'addBarSubscriptions', options})     
         this.socketClient.send('addBarSubscriptions', options)
     }
 

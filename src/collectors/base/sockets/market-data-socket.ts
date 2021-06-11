@@ -21,12 +21,6 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             socket.emit('initialize', { instanceId: this.instanceId })
             socket.on('disconnect', (reason: string) => {
                 this.removeConnectionFromAllSubscriptions(socket.id)
-
-                // remove subscriptions with no remaining connections
-                this.activeSubscriptions = this.activeSubscriptions.filter(s => s.connections.length > 0)
-                
-                // TODO: call unsubcribe method if all connections have been removed (using callbacks provided)
-
             })
 
             socket.on('message', (requestType: RequestType, options: LiveOrderBookOptions) => {

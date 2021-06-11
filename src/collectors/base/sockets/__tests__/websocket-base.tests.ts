@@ -1,6 +1,9 @@
 import { WebSocketServerBase } from '../websocket-base'
 import { ProviderOptions } from '../../../base/models/provider-options'
-import { assert } from 'console';
+import { SocketTester } from 'socket.io-await-test'
+import io from 'socket.io-client'
+import { after, before } from 'lodash';
+import { disconnect } from 'process';
 
 let wsServer:WebSocketServerBase;
 
@@ -14,11 +17,11 @@ afterEach(() => {
 });
 
 let defaultOptions: ProviderOptions = {
-    id: 'test', scriptLocations: [{ type: 'MarketData', location: ''}], name: 'test', supportedModes: ['BACKTEST'], apiOptions: new Map()
+    id: 'test', scriptLocations: [{ type: 'MarketData', location: ''}], name: 'test', supportedModes: ['BACKTEST'], apiOptions: new Map(),
+    webSocketOptions: { url: 'http://localhost', port: 3000 }
 }
 
-describe("WebSocket connection/subscription management tests", () => {   
-
+describe("WebSocket connection/subscription management tests", () => {
     test('should add new connections and subscriptions', () => {
         expect(wsServer.activeSubscriptions).toHaveLength(0)
         // basic BAR subscription
@@ -110,5 +113,41 @@ describe("WebSocket connection/subscription management tests", () => {
         // remove all for the final collection and expect no subscriptions
         wsServer.removeConnectionFromAllSubscriptions('connection-id-3')
         expect(wsServer.activeSubscriptions).toHaveLength(0)
+    })
+})
+
+describe("WebSocket Server Start/Stop", () => {
+    
+    let socketUrl = `${defaultOptions.webSocketOptions?.url}:${defaultOptions.webSocketOptions?.port}`
+    test('should start and stop a new webSocket server', async () => {
+        wsServer.startServer()
+        const client = io(socketUrl)
+        const client2 = io(socketUrl)
+
+        const socketTester = new SocketTester(client)
+        const status = socketTester.on('ServerStatus')
+
+        client.emit('message', 'status')
+        await status.waitForAny()
+
+        const statusResponse = status.get(0) as any
+        expect(statusResponse['type']).toBe('WebSocket')
+        expect(statusResponse['status']).toBe('ACTIVE')
+        expect(statusResponse['connections']).toBe(2)
+        expect(statusResponse['activeSubscriptions']).toHaveLength(0)
+
+        // close one connection and expect connection to be dropped
+        client2.close()
+        await new Promise( (res) => setTimeout(res, 500))
+        expect(wsServer.connections.size).toBe(1)
+
+        // close 2nd connection and expect connections to be empty
+        client.close()
+        await new Promise( (res) => setTimeout(res, 500))
+        expect(wsServer.connections.size).toBe(0)
+
+        // close server, expect status to be closed
+        wsServer.close()
+        expect(wsServer.status).toBe('CLOSED')
     })
 })

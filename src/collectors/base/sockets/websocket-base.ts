@@ -12,7 +12,7 @@ export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'ORDER'
 export class WebSocketServerBase {
     port: number
     url: string 
-    connections: any = {}
+    connections: Map<string, Socket> = new Map()
     socketServer?: Server
     status: string
     connectionTime?: Date
@@ -42,23 +42,27 @@ export class WebSocketServerBase {
         app.use(cors());
         app.use((err: any, req: Request, res: Response, next: NextFunction) => next(res.status(err.output.statusCode).json(err.output.payload)));
         
-        this.socketServer.on("connection", (socket: Socket) => {
-            this.connections[socket.id] = socket            
+        this.socketServer.on('connection', (socket: Socket) => {
+            this.connections.set(socket.id, socket)            
             console.log(`user connected: ${socket.id}`)
+
             socket.on('disconnect', (reason) => {
                 console.log(`${new Date()} disconnecting ${socket.id}, reason=${reason}`)
-                delete this.connections[socket.id]
+                this.connections.delete(socket.id)
             })
-        })
 
-        this.socketServer.on("message", (type: any) => {
-            if (type === 'status') {
-                this.socketServer?.emit("ServerStatus", {
-                    providerId: this.providerId, type: 'WebSocket', status: this.status,
-                    connections: this.connections.length, activeSubscriptions: this.activeSubscriptions
-                })
-            }
-        })
+            socket.on('message', (type: any) => {
+                console.log(`received message: ${type}`)
+                if (type === 'status') {
+                    socket.emit('ServerStatus', {
+                        providerId: this.providerId, type: 'WebSocket', status: this.status,
+                        connections: this.connections.size, activeSubscriptions: this.activeSubscriptions
+                    })
+                }
+            })
+
+            socket.on('ping', () => socket.emit('pong'))
+        })        
     }
     
     addSubscription(connectionId: string, type: SubscriptionType, options: any) {
@@ -104,6 +108,7 @@ export class WebSocketServerBase {
     }
 
     close() {
+        this.status = 'CLOSED'
         this.socketServer?.close()
     }
 }
