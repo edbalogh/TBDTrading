@@ -2,8 +2,6 @@ import { WebSocketServerBase } from '../websocket-base'
 import { ProviderOptions } from '../../../base/models/provider-options'
 import { SocketTester } from 'socket.io-await-test'
 import io from 'socket.io-client'
-import { after, before } from 'lodash';
-import { disconnect } from 'process';
 
 let wsServer:WebSocketServerBase;
 
@@ -13,7 +11,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    // Events.removeAllListeners();
+    
 });
 
 let defaultOptions: ProviderOptions = {

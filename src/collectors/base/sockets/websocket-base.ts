@@ -52,7 +52,6 @@ export class WebSocketServerBase {
             })
 
             socket.on('message', (type: any) => {
-                console.log(`received message: ${type}`)
                 if (type === 'status') {
                     socket.emit('ServerStatus', {
                         providerId: this.providerId, type: 'WebSocket', status: this.status,
