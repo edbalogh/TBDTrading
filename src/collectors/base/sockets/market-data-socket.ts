@@ -24,25 +24,32 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             })
 
             socket.on('message', (requestType: RequestType, options: LiveOrderBookOptions) => {
-                       switch (requestType) {
+                console.log('received message', requestType)
+                let finalOptions;
+                switch (requestType) {
                     case 'addBarSubscriptions':
-                        this.handleBarSubscription(socket.id, options, eventCallBacks.get(requestType))
+                        finalOptions = this.handleBarSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
+                        socket.emit('addSubscription_success', finalOptions)
                         break
                     case 'addBookSubscriptions':
-                        this.handleBookSubscriptionRequest(socket.id, options, eventCallBacks.get(requestType))
+                        finalOptions = this.handleBookSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
+                        socket.emit('addSubscription_success', finalOptions)
                         break
                     case 'addTradeSubscriptions':
-                        this.handleTradeSubscription(socket.id, options, eventCallBacks.get(requestType))
+                        finalOptions = this.handleTradeSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
+                        socket.emit('addSubscription_success', finalOptions)
                         break
                     default:
                         console.log(`unknown market data request type ${requestType}`)
+                        socket.emit('addSubscription_failed', options)
                 }
             })
         })
     }
 
-    handleBarSubscription(connectionId: string, options: LiveBarOptions, cb?: Function) {
+    handleBarSubscriptionRequests(connectionId: string, options: LiveBarOptions, cb?: Function) {
         if (!cb) throw new Error('no callback found for addBarSubscriptions event')
+        console.log(`registering new bar subscription for connection ${connectionId}`)
         const newSymbols: string[] = []
         options.symbols.map(s => {
             const subOptions = { symbols: s, timeframe: options.timeframe }
@@ -50,15 +57,18 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             this.addSubscription(connectionId, 'BAR', subOptions)
         })
 
+        const newOptions = { ...options }
         if (newSymbols.length > 0) {
-            const newOptions = { ...options }
             newOptions.symbols = newSymbols
-            cb(options)
+            cb(newOptions)
         }
+
+        return newOptions
     }
 
-    handleBookSubscriptionRequest(connectionId: string, options: LiveOrderBookOptions, cb?: Function) {
+    handleBookSubscriptionRequests(connectionId: string, options: LiveOrderBookOptions, cb?: Function) {
         if (!cb) throw new Error('no callback found for addBookSubscriptions event')
+        console.log(`registering new order book subscriptions for connection ${connectionId}`)
         const newSymbols: string[] = []
         
         options.symbols.forEach(s => {
@@ -67,15 +77,18 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             this.addSubscription(connectionId, 'BOOK', subOptions)
         })
 
+        const newOptions = { ...options }
         if (newSymbols.length > 0) {
-            const newOptions = { ...options }
             newOptions.symbols = newSymbols
-            cb(options)
+            cb(newOptions)
         }
+
+        return newOptions
     }
 
-    handleTradeSubscription(connectionId: string, options: LiveTradeOptions, cb?: Function) {
+    handleTradeSubscriptionRequests(connectionId: string, options: LiveTradeOptions, cb?: Function) {
         if (!cb) throw new Error('no callback found for addTradeSubscriptions event')
+        console.log(`registering new trade subscriptions for connection ${connectionId}`)
         const newSymbols: string[] = []
         options.symbols.map(s => {
             const subOptions = { symbol: s }
@@ -83,10 +96,13 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             this.addSubscription(connectionId, 'TRADE', subOptions)
         })
 
+
+        const newOptions = { ...options }
         if (newSymbols.length > 0) {
-            const newOptions = { ...options }
             newOptions.symbols = newSymbols
-            cb(options)
+            cb(newOptions)
         }
+
+        return newOptions
     }
 }
