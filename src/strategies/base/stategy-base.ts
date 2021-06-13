@@ -2,9 +2,9 @@ import { Execution, SymbolDetails } from '../base/models/strategy-options'
 import { ProviderOptions, Connection, ProviderType } from '../../collectors/base/models/provider-options'
 import { Bar } from '../../collectors/base/models/bar'
 import { OrderBook } from '../../collectors/base/models/order-book'
+import { Order } from '../../collectors/base/models/order'
 import { Mode } from '../../constants/types'
 import config from '../../../config'
-import fs from 'fs'
 
 export abstract class StrategyBase {
     execution: Execution
@@ -58,7 +58,6 @@ export abstract class StrategyBase {
         }))
     }
 
-
     addMarketDataListener(providerOptions: ProviderOptions, location: string): void {
         const MarketDataClass = require(location)
         const md = new MarketDataClass(providerOptions, this.mode)
@@ -109,7 +108,15 @@ export abstract class StrategyBase {
         return connection
     }
 
-    addBrokerListener(providerOptions: ProviderOptions, location: string): void { }
+    addBrokerListener(providerOptions: ProviderOptions, location: string): void {
+        const BrokerClass = require(location)
+        const broker = new BrokerClass(providerOptions, this.mode)
+        broker.on(`${this.symbol?.symbol}.order`, (order: Order) => this._onOrderUpdate(order))
+
+        // start listener
+        broker.startSocketListener()
+        this.connections.push({ class: broker, options: providerOptions })
+    }
 
     addOtherListener(providerOptions: ProviderOptions, location: string): void { }
 
@@ -127,10 +134,15 @@ export abstract class StrategyBase {
         return bar
     }
 
+    async _onOrderUpdate(order: Order): Promise<void> {
+        this.onOrderUpdate(order)
+    }
+
     async _onOrderBookUpdate(book: OrderBook): Promise<void> {
         this.onOrderBookUpdate(book)
     }
 
     async onNextBar(bar: Bar): Promise<void> { }
     onOrderBookUpdate(book: OrderBook): void { }
+    onOrderUpdate(order: Order): void {}
 }

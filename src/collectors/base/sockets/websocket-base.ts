@@ -7,7 +7,7 @@ import { v4 as uuid } from 'uuid'
 import { isEqual } from 'lodash'
 import { Mode } from '../../../constants/types'
 
-export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'ORDER'
+export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'ORDER' | 'ACCOUNT' | 'BALANCE'
 
 export class WebSocketServerBase {
     port: number

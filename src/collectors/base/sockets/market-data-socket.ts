@@ -4,7 +4,7 @@ import { Mode } from '../../../constants/types'
 import { Socket } from 'socket.io'
 import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../models/options'
 
-export type RequestType = 'addBarSubscriptions' | 'addTradeSubscriptions' | 'addBookSubscriptions' | 'removeBarSubscription' | 'removeBookSubscription' | 'removeTradeSubscription'
+export type RequestType = 'addBarSubscriptions' | 'addTradeSubscriptions' | 'addBookSubscriptions'
 
 export class MarketDataSocketServer extends WebSocketServerBase {
     constructor(options: ProviderOptions, mode: Mode) {
@@ -23,7 +23,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
                 this.removeConnectionFromAllSubscriptions(socket.id)
             })
 
-            socket.on('message', (requestType: RequestType, options: LiveOrderBookOptions) => {
+            socket.on('message', (requestType: RequestType, options: LiveBarOptions | LiveOrderBookOptions | LiveTradeOptions) => {
                 console.log('received message', requestType)
                 let finalOptions;
                 switch (requestType) {
@@ -95,7 +95,6 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             if (!this.subscriptionExists('TRADE', subOptions)) newSymbols.push(s)
             this.addSubscription(connectionId, 'TRADE', subOptions)
         })
-
 
         const newOptions = { ...options }
         if (newSymbols.length > 0) {
