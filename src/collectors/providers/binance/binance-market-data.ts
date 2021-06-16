@@ -153,7 +153,6 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return <CandlesOptions>finalOptions;
     }
 
-
     /**
      * Starts streaming live bar data from binance
      * @param options platforms LiveBarOptions

@@ -1,4 +1,4 @@
-import { ProviderOptions } from './models/provider-options'
+import { ProviderOptions, getProviderSocketOptionsByType } from './models/provider-options'
 import { BrokerSocketServer, OrderSubscriptionOptions, RequestType } from './sockets/broker-socket'
 import { Mode } from '../../constants/types'
 import { EventEmitter } from 'events'
@@ -114,13 +114,22 @@ export abstract class BrokerProviderBase extends EventEmitter {
         eventCallbacks.set('addBalanceSubscription', this.addServerBalanceSubscription.bind(this))
 
         // add Account and Balance listeners
-        this.providerServer.handleAccountSubscriptionRequest('server')
-        this.providerServer.handleBalanceSubscriptionRequest('server')
         this.providerServer.registerEvents(eventCallbacks)
+        this.providerServer.handleAccountSubscriptionRequest('server', this.addServerAccountSubscription.bind(this))
     }
 
     stopSocketServer() {
         this.providerServer?.close()
+    }
+
+    getLiveAccountData() {
+        this.subscriptionHistory.push({topic: 'addAccountSubscription'})     
+        this.socketClient.send('addAccountSubscription')
+    }
+
+    getLiveOrderExecutionData() {
+        this.subscriptionHistory.push({topic: 'addOrderSubscriptions'})     
+        this.socketClient.send('addOrderSubscriptions')
     }
     
     // method to add the bar subscription to the local server
@@ -143,8 +152,9 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     // WebSocket Listener
     startSocketListener() {
-        const port = this.options.webSocketOptions ? this.options.webSocketOptions.port : 3000
-        const url = this.options.webSocketOptions && this.options.webSocketOptions.url ? this.options.webSocketOptions.url : 'http://localhost'
+        const wsOptions = getProviderSocketOptionsByType(this.options, 'Broker', this.mode)
+        const port = wsOptions ? wsOptions.port : 3000
+        const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
         this.socketClient = io(`${url}:${port}`)
         this.socketClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)
@@ -162,14 +172,45 @@ export abstract class BrokerProviderBase extends EventEmitter {
     }
 }
 
+export type OrderStatus = 'OPEN' | 'REJECTED' | 'CLOSED' | 'CANCELED' | 'ERROR' | 'LOST' | 'FILLED' | 'PARTIALLY_FILLED'
+export type OrderSide = 'BUY' | 'SELL'
+export type TimeInForce = 'GTC' | 'IOC' | 'FOK' | 'OPG'
+export type OrderType = 'LIMIT' | 'LIMIT_MAKER' | 'MARKET' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'
+export type ExecutionType = 'NEW' | 'CANCELED' | 'REPLACED' | 'REJECTED' | 'TRADE' | 'EXPIRED'
+
 export interface OrderExecution {
-    symbol: string
+    symbol: string,
+    orderId: string,
+    brokerOrderId: string,
+    executionType: ExecutionType,
+    executionTime: Date,
+    orderType: OrderType,
+    orderTime: Date,
+    orderStatus: OrderStatus,
+    orderSide: OrderSide,
+    tif: TimeInForce,
+    executionQuantity: number,
+    totalQuantity: number,
+    executionPrice: number,
+    rejectReason?: string,
+    commission?: number,
+    commissionAsset?: string,
+    tradeId?: string
 }
 
-export interface AccountInfo {}
-
-export interface BrokerPosition {
-    symbol: string
+export interface AccountInfo {
+    lastUpdateTime: Date,
+    balances: Balance[]
 }
 
-export interface BrokerBalance {}
+export interface Balance {
+    asset: string,
+    total: number,
+    available: number,
+    inOrder: number
+}
+
+export interface BrokerBalance {
+    available: number,
+    locked: number
+}

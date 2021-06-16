@@ -1,4 +1,4 @@
-import { ProviderOptions } from './models/provider-options'
+import { ProviderOptions, getProviderSocketOptionsByType } from './models/provider-options'
 import { Mode } from '../../constants/types'
 import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from './models/options'
 import { EventEmitter } from 'events'
@@ -131,7 +131,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * Open socket and/or add subscriptions for live bar data
      * @param options options for requesting bars from a websocket
      */
-    async getLiveBarData(options: LiveBarOptions): Promise<void> {
+    getLiveBarData(options: LiveBarOptions) {
         this.subscriptionHistory.push({topic: 'addBarSubscriptions', options})     
         this.socketClient.send('addBarSubscriptions', options)
     }
@@ -140,7 +140,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      * Open socket and/or add subscriptions for live bar data
      * @param options options for requesting live order book data
      */
-    async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {
+    getLiveOrderBook(options: LiveOrderBookOptions) {
         this.subscriptionHistory.push({topic: 'addBookSubscriptions', options})
         this.socketClient.send('addBookSubscriptions', options)
     }
@@ -188,8 +188,9 @@ export abstract class MarketDataProviderBase extends EventEmitter {
 
     // WebSocket Listener
     startSocketListener() {
-        const port = this.options.webSocketOptions ? this.options.webSocketOptions.port : 3000
-        const url = this.options.webSocketOptions && this.options.webSocketOptions.url ? this.options.webSocketOptions.url : 'http://localhost'
+        const wsOptions = getProviderSocketOptionsByType(this.options, 'MarketData', this.mode)
+        const port = wsOptions ? wsOptions.port : 3000
+        const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
         this.socketClient = io(`${url}:${port}`)
         this.socketClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)

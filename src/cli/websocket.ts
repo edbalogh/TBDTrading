@@ -1,7 +1,8 @@
-import yargs, { Argv } from 'yargs'
+import { Argv } from 'yargs'
 import { ProviderOptions } from '../collectors/base/models/provider-options'
 import config from '../../config'
 const BinanceMarketData = require('../collectors/providers/binance/binance-market-data')
+const BinanceBroker = require('../collectors/providers/binance/binance-broker')
 
 export function wsServer(yargs: Argv) {
     const options = yargs
@@ -10,10 +11,17 @@ export function wsServer(yargs: Argv) {
             alias: 'i',
             default: 'binance',
             type: 'string'
-        }).argv
+        })
+        .options('connectionType', {
+            describe: 'Connection Type',
+            alias: 't',
+            default: 'MarketData',
+            type: 'string'
+        })
+        .argv
 
     const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
-    const binance = new BinanceMarketData(providerOptions, 'LIVE')
+    const binance = options.connectionType === 'MarketData' ? new BinanceMarketData(providerOptions, 'LIVE') : new BinanceBroker(providerOptions, 'LIVE')
     binance.startSocketServer()
 
     process.on('SIGINT', function () {
@@ -36,46 +44,54 @@ export function wsClient(yargs: Argv) {
             default: 'binance',
             type: 'string'
         })
-        .option('topic', {
-            describe: 'topic',
+        .option('topics', {
+            describe: 'topics',
             alias: 't',
             default: 'book',
             type: 'string'
         }).argv
 
     const symbols = options.symbols.split(',')
+    const topics = options.topics.split(',')
     const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
-    const binance = new BinanceMarketData(providerOptions, 'LIVE')
+    const binanceData = new BinanceMarketData(providerOptions, 'LIVE')
+    const binanceBroker = new BinanceBroker(providerOptions, 'LIVE')
 
     process.on('SIGINT', function () {
         console.log("Caught interrupt signal, closing socket");
-        binance.stopSocketListener()
+        binanceData.stopSocketListener()
+        binanceBroker.stopSocketListener()
         process.exit();
     });
 
-    binance.startSocketListener()
-    
-    switch(options.topic.toLowerCase()) {
-        case 'book':
-            symbols.forEach(s => {
-                binance.on(`${s}.book`, (e: any) => console.log(e))
-            })
-            binance.getLiveOrderBook({symbols})
-            break
-        case 'bar':
-            symbols.forEach(s => {
-                binance.on(`${s}.bar`, (e: any) => console.log(e))
-            })
-            binance.getLiveBarData({symbols, timeframe: '1h', showActive: true})
-            break 
-        case 'both':
-            symbols.forEach(s => {
-                binance.on(`${s}.bar`, (e: any) => console.log(e))
-                binance.on(`${s}.book`, (e: any) => console.log(e))
-            })
-            binance.getLiveBarData({symbols, timeframe: '1h', showActive: true})
-            binance.getLiveOrderBook({symbols})
-            break
+    binanceData.startSocketListener()
+    binanceBroker.startSocketListener()
+
+    if (topics.includes('book')) {
+        symbols.forEach(s => {
+            binanceData.on(`${s}.book`, (e: any) => console.log(e))
+        })
+        binanceData.getLiveOrderBook({ symbols })
     }
-   
+    if (topics.includes('bar')) {
+        symbols.forEach(s => {
+            binanceData.on(`${s}.bar`, (e: any) => console.log(e))
+        })
+        binanceData.getLiveBarData({ symbols, timeframe: '1m', showActive: false })
+    }
+    if (topics.includes('executions')) {
+        symbols.forEach(s => {
+            binanceBroker.on(`${s}.orderExecution`, (e: any) => console.log(e))
+        })
+        binanceBroker.getLiveOrderExecutionData({ symbols })
+    }
+    if (topics.includes('account')) {
+        binanceBroker.on('accountInfo', (e: any) => console.log(e))
+        binanceBroker.getLiveAccountData()
+    }
+    if (topics.includes('raw')) {
+        binanceBroker.socketClient.onAny((event: any, ...args: any) => {
+            console.log(event); console.log(args)
+        })
+    }
 }

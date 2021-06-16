@@ -2,12 +2,12 @@ import cors from 'cors'
 import express, {Express, NextFunction, Request, Response} from 'express'
 import http from 'http'
 import {Server, Socket} from 'socket.io'
-import { ProviderOptions, ProviderType } from '../models/provider-options'
+import { ProviderOptions, ProviderType, getProviderSocketOptionsByType } from '../models/provider-options'
 import { v4 as uuid } from 'uuid'
 import { isEqual } from 'lodash'
 import { Mode } from '../../../constants/types'
 
-export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'ORDER' | 'ACCOUNT' | 'BALANCE'
+export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'EXECUTION' | 'ACCOUNT' | 'BALANCE'
 
 export class WebSocketServerBase {
     port: number
@@ -25,8 +25,9 @@ export class WebSocketServerBase {
     constructor(options: ProviderOptions, type: ProviderType, mode: Mode) {
         this.instanceId = uuid()
         this.providerId = options.id
-        this.port = options.webSocketOptions ? options.webSocketOptions.port : 3000
-        this.url = options.webSocketOptions && options.webSocketOptions.url ? options.webSocketOptions.url : 'https://localhost'
+        const wsOptions = getProviderSocketOptionsByType(options, type, mode)
+        this.port = wsOptions ? wsOptions.port : 3000
+        this.url = wsOptions && wsOptions.url ? wsOptions.url : 'https://localhost'
         this.providerType = type
         this.mode = mode
         this.status = 'ACTIVE'

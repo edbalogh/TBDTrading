@@ -52,8 +52,8 @@ export class BrokerSocketServer extends WebSocketServerBase {
         const newSymbols: string[] = []
         options?.symbols.map(s => {
             const subOptions = { symbols: s }
-            if (!this.subscriptionExists('ORDER', subOptions)) newSymbols.push(s)
-            this.addSubscription(connectionId, 'ORDER', subOptions)
+            if (!this.subscriptionExists('EXECUTION', subOptions)) newSymbols.push(s)
+            this.addSubscription(connectionId, 'EXECUTION', subOptions)
         })
 
         const newOptions = { ...options }
@@ -65,22 +65,24 @@ export class BrokerSocketServer extends WebSocketServerBase {
     }
 
     handleAccountSubscriptionRequest(connectionId: string, cb?: Function) {
-        if (!cb) throw new Error('no callback found for addBookSubscriptions event')
+        if (!cb) throw new Error('no callback found for addAccountSubscriptions event')
         console.log(`registering new order book subscriptions for connection ${connectionId}`)
         
         if (!this.subscriptionExists('ACCOUNT', {})) {
             this.addSubscription(connectionId, 'ACCOUNT', {})
+            cb()
             return { status: 'started' }
         }
         return { status: 'exists' }        
     }
 
     handleBalanceSubscriptionRequest(connectionId: string, cb?: Function) {
-        if (!cb) throw new Error('no callback found for addTradeSubscriptions event')
+        if (!cb) throw new Error('no callback found for addBalanceSubscriptions event')
         console.log(`registering new trade subscriptions for connection ${connectionId}`)
 
         if (!this.subscriptionExists('BALANCE', {})) {
             this.addSubscription(connectionId, 'BALANCE', {})
+            cb()
             return { status: 'started' }
         }
         return { status: 'exists' }

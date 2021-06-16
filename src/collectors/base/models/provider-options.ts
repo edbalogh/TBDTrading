@@ -54,17 +54,23 @@ export interface ProviderOptions {
     supportedModes: Mode[],
     scriptLocations: ProviderScript[],
     apiOptions: any,
-    webSocketOptions?: WebSocketOptions,
-    kinesisOptions?: KinesisOptions
+    webSocketOptions?: WebSocketOptions[],
+    kinesisOptions?: KinesisOptions[]
 }
 
 export interface WebSocketOptions {
-    port: number
-    url?: string
+    type: ProviderType,
+    mode: Mode,
+    port: number,
+    url?: string    
 }
 
 export interface KinesisOptions {
+    type: ProviderType
+}
 
+export function getProviderSocketOptionsByType(options: ProviderOptions, type: ProviderType, mode: Mode): any {
+    return options.webSocketOptions?.find(x => x.type === type && x.mode === mode)
 }
 
 
