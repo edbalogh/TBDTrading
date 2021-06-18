@@ -35,6 +35,7 @@ export default {
                 wsBase: "wss://stream.binance.us:9443/ws"
             },
             webSocketOptions: {
+                url: 'https://localhost',
                 port: 3000
             },
             kinesisOptions: {}
@@ -60,6 +61,7 @@ export default {
                 usePolygon: false
             },
             webSocket: {
+                url: 'https://localhost',
                 port: 3002
             }
         },

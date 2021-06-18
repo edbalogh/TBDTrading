@@ -12,9 +12,9 @@ export class BasicArbitrage extends StrategyBase {
         super(options, symbolDetails)
     }
 
-    onOrderBookUpdate(book: OrderBook) {
+    async onOrderBookUpdate(book: OrderBook) {
         this.bookXref[`${book.symbol}::${book.providerId}`] = book
-        this.evaluateEntry()
+        return this.evaluateEntry()
     }
 
     evaluateEntry() {

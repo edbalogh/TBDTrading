@@ -2,9 +2,10 @@ import { Execution, SymbolDetails } from '../base/models/strategy-options'
 import { ProviderOptions, Connection, ProviderType } from '../../collectors/base/models/provider-options'
 import { Bar } from '../../collectors/base/models/bar'
 import { OrderBook } from '../../collectors/base/models/order-book'
-import { Mode } from '../../constants/types'
+import { Order } from '../../collectors/base/models/order'
+import { OrderExecution } from '../../collectors/base/broker-base'
+import { Mode } from '../../common/definitions/basic'
 import config from '../../../config'
-import fs from 'fs'
 
 export abstract class StrategyBase {
     execution: Execution
@@ -58,7 +59,6 @@ export abstract class StrategyBase {
         }))
     }
 
-
     addMarketDataListener(providerOptions: ProviderOptions, location: string): void {
         const MarketDataClass = require(location)
         const md = new MarketDataClass(providerOptions, this.mode)
@@ -109,7 +109,16 @@ export abstract class StrategyBase {
         return connection
     }
 
-    addBrokerListener(providerOptions: ProviderOptions, location: string): void { }
+    addBrokerListener(providerOptions: ProviderOptions, location: string): void {
+        const BrokerClass = require(location)
+        const broker = new BrokerClass(providerOptions, this.mode)
+        broker.on(`${this.symbol?.symbol}.orderExecution`, (order: OrderExecution) => this._onOrderExecution(order))
+        broker.on(`${this.symbol?.symbol}.orderComplete`, (order: Order) => this._onOrderComplete(order))
+
+        // start listener
+        broker.startSocketListener()
+        this.connections.push({ class: broker, options: providerOptions })
+    }
 
     addOtherListener(providerOptions: ProviderOptions, location: string): void { }
 
@@ -127,10 +136,24 @@ export abstract class StrategyBase {
         return bar
     }
 
+    async _onOrderExecution(order: OrderExecution): Promise<void> {
+        return this.onOrderExecution(order)
+    }
+
+    async _onOrderUpdate(order: Order): Promise<void> {
+        return this.onOrderUpdate(order)
+    }
+
+    async _onOrderComplete(order: Order): Promise<void> {
+        return this.onOrderUpdate(order)
+    }
+
     async _onOrderBookUpdate(book: OrderBook): Promise<void> {
-        this.onOrderBookUpdate(book)
+        return this.onOrderBookUpdate(book)
     }
 
     async onNextBar(bar: Bar): Promise<void> { }
-    onOrderBookUpdate(book: OrderBook): void { }
+    async onOrderBookUpdate(book: OrderBook): Promise<void> { }
+    async onOrderExecution(order: OrderExecution): Promise<void> {}
+    async onOrderUpdate(order: Order): Promise<void> {}
 }

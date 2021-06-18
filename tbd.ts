@@ -1,11 +1,12 @@
 #!/usr/bin/env ts-node
 
-import { OrderBook } from './src/collectors/base/models/order-book';
+import { OrderBook } from './src/common/definitions/broker';
 import yargs, { Argv } from 'yargs'
-import { ProviderOptions } from './src/collectors/base/models/provider-options'
+import { ProviderOptions } from './src/common/definitions/options'
 import config from './config'
 const BinanceMarketData = require('./src/collectors/providers/binance/binance-market-data')
 import { Execution } from './src/strategies/base/models/strategy-options';
+import { wsServer, wsClient } from './src/cli/websocket'
 
 
 yargs
@@ -56,64 +57,7 @@ function executeStrategy(yargs: Argv) {
     return
 }
 
-function wsServer(yargs: Argv) {
-    const options = yargs.option('symbols', {
-        describe: 'Symbol List (comma separated)',
-        alias: 's',
-        default: 'ADAUSDT,DOGEUSDT',
-        type: 'string'
-    })
-        .options('providerId', {
-            describe: 'providerId',
-            alias: 'i',
-            default: 'binance',
-            type: 'string'
-        }).argv
 
-    const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
-    const binance = new BinanceMarketData(providerOptions, 'LIVE')
-    binance.startSocketServer()
-
-    process.on('SIGINT', function () {
-        console.log("Caught interrupt signal, closing socket");
-        binance.stopSocketServer()
-        process.exit();
-    });
-
-    binance.getLiveOrderBook({ symbols })
-}
-
-async function wsClient(yargs: Argv) {
-    const options = yargs.option('symbols', {
-        describe: 'Symbol List (comma separated)',
-        alias: 's',
-        default: 'ADAUSDT,DOGEUSDT',
-        type: 'string'
-    })
-        .option('providerId', {
-            describe: 'providerId',
-            alias: 'i',
-            default: 'binance',
-            type: 'string'
-        }).argv
-
-    const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
-    const binance = new BinanceMarketData(providerOptions, 'LIVE')
-
-    symbols.forEach(s => {
-        binance.on(`${s}.book`, (e: any) => console.log(e))
-    })
-
-    process.on('SIGINT', function () {
-        console.log("Caught interrupt signal, closing socket");
-        binance.stopSocketListener()
-        process.exit();
-    });
-
-    binance.startSocketListener()
-}
 
 function demo(type: string) {
     switch (type) {
@@ -125,9 +69,6 @@ function demo(type: string) {
             break;
         case 'live-book':
             liveOrderBookDemo()
-            break;
-        case 'basic-arb':
-            basicArbitrageDemo()
             break;
         default:
             break
@@ -251,107 +192,5 @@ function liveOrderBookDemo() {
     });
 
     binance.getLiveOrderBook({ symbols })
-}
-
-function basicArbitrageDemo() {
-    const options = yargs.option("symbols", {
-        describe: "Symbol List (comma separated)",
-        alias: "s",
-        default: "ADAUSDT,DOGEUSDT",
-        type: "string"
-    })
-        .option("verbose", {
-            describe: "Show Orderbook on Opportunity",
-            alias: "v",
-            default: false,
-            type: "boolean"
-        })
-        .options('providerId', {
-            describe: 'providerId',
-            alias: 'i',
-            default: 'binance',
-            type: 'string'
-        }).argv
-
-    const symbols = options.symbols.split(',')
-    const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
-    const binance = new BinanceMarketData(providerOptions, 'LIVE')
-    const latestBook: Map<string, OrderBook> = new Map()
-
-    let total = 0.0
-    let tradeCount = 0
-    let noFeeTotal = 0
-
-    symbols.forEach(s => {
-        binance.on(`${s}.book`, (book: OrderBook) => {
-            bookListener(book)
-        })
-    })
-
-    function bookListener(book: OrderBook) {
-        latestBook.set(book.symbol, book)
-        latestBook.forEach(b => {
-            if (b.symbol === book.symbol) return
-
-            if (b.bids[0].price > book.asks[0].price) {
-                trackArb(book, b, b.eventTime)
-            }
-
-            if (book.bids[0].price > b.asks[0].price) {
-                trackArb(b, book, b.eventTime)
-            }
-        })
-    }
-
-    process.on('SIGINT', function () {
-        console.log("Caught interrupt signal, closing socket");
-
-        binance.stopMarketDataStream()
-        process.exit();
-    });
-
-
-
-    binance.getLiveOrderBook({ symbols })
-
-    function trackArb(buyBook: OrderBook, sellBook: OrderBook, eventTime: Date) {
-        const shares = Math.min(sellBook.bids[0].quantity, buyBook.asks[0].quantity)
-        const opportunity = (sellBook.bids[0].price - buyBook.asks[0].price) * shares
-        const fees = (sellBook.bids[0].price + buyBook.asks[0].price) * shares * 0.001
-
-        if (!opportunity) {
-            console.log(`invalid opportunity ${opportunity}`)
-            console.log(buyBook)
-            console.log(sellBook)
-            return
-        }
-
-        noFeeTotal += opportunity
-        if (opportunity - fees < 0) {
-            console.log(`unprofitable opportunity at ${eventTime}`)
-            console.log(
-                {
-                    buySymbol: buyBook.symbol, sellSymbol: sellBook.symbol, opportunity, fees, shares, buyPrice: buyBook.asks[0].price,
-                    sellPrice: sellBook.bids[0].price, diff: sellBook.bids[0].price - buyBook.asks[0].price, noFeeTotal, total, tradeCount
-                }
-            )
-            return
-        }
-
-        tradeCount += 1
-        total += opportunity - fees
-        console.log(`******* ${eventTime}`)
-        console.log(` BUY  ${buyBook.symbol} @ ${buyBook.asks[0].price} (${buyBook.asks[0].quantity}) `)
-        console.log(` SELL ${sellBook.symbol} @ ${sellBook.bids[0].price} (${sellBook.bids[0].quantity}) `)
-        console.log(` OPPORTUNITY ${opportunity}`)
-        console.log(` FEES  ${fees}`)
-        console.log(` TOTAL ${opportunity - fees}`)
-        console.log(` GRAND TOTAL ${total}`)
-        console.log(`*******`)
-        if (options.verbose) {
-            console.log(buyBook)
-            console.log(sellBook)
-        }
-    }
 }
 

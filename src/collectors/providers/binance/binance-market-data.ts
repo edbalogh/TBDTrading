@@ -1,11 +1,10 @@
-import { Mode } from '../../../constants/types'
+import { Mode } from '../../../common/definitions/basic'
 import { MarketDataProviderBase } from '../../base/market-data-base'
-import { Bar } from '../../base/models/bar'
-import { OrderBook, BookLevel } from '../../base/models/order-book'
+import { OrderBook, BookLevel } from '../../../common/definitions/broker'
+import { Bar, HistoricalBarOptions } from '../../../common/definitions/market-data'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
-import { ProviderOptions } from '../../base/models/provider-options'
+import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../common/definitions/options'
 import { last } from 'lodash'
-import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions } from '../../base/models/options'
 import { CandlesOptions, CandleChartInterval, Candle, CandleChartResult, Depth } from 'binance-api-node'
 
 
@@ -14,7 +13,7 @@ const Binance = require('binance-api-node').default
 const utils = require('../../../utils/legacy.js')  // TODO: deprecate the legacy utils
 
 export class BinanceMarketData extends MarketDataProviderBase {
-
+    providerSocket: any
     constructor(options: ProviderOptions, mode: Mode) {
         const client = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
         super(options, mode, client)
@@ -153,13 +152,12 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return <CandlesOptions>finalOptions;
     }
 
-
     /**
      * Starts streaming live bar data from binance
      * @param options platforms LiveBarOptions
      */
-    async getLiveBarData(options: LiveBarOptions): Promise<void> {
-        this.socketClient = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
+    addProviderBarSubscriptions(options: LiveBarOptions): void {
+        this.providerSocket = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
             switch (event.eventType) {
                 case 'kline':
                     const bar: Bar = this.translateLiveBar(event)
@@ -170,7 +168,6 @@ export class BinanceMarketData extends MarketDataProviderBase {
                     console.log(event)
             }
         });
-        return this.socketClient
     }
 
 
@@ -191,8 +188,9 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return <OrderBook>book
     }
 
-    async getLiveOrderBook(options: LiveOrderBookOptions): Promise<void> {
-        this.socketClient = this.client.ws.depth(options.symbols, (event: Depth) => {
+    addProviderBookSubscriptions(options: LiveOrderBookOptions): any {   
+        console.log('addProviderBookSubscriptions')     
+        this.providerSocket = this.client.ws.depth(options.symbols, (event: Depth) => {
             switch (event.eventType) {
                 case 'depthUpdate':
                     const book = this.translateLiveOrderBook(event)
@@ -208,7 +206,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
     }
 
     stopMarketDataStream() {
-        this.socketClient();
+        this.providerSocket();
     }
 }
 
