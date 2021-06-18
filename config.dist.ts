@@ -34,10 +34,20 @@ export default {
                 httpBase: "https://api.binance.us",
                 wsBase: "wss://stream.binance.us:9443/ws"
             },
-            webSocketOptions: {
-                url: 'https://localhost',
-                port: 3000
-            },
+            webSocketOptions: [
+                {
+                    type: 'MarketData',
+                    mode: 'LIVE',
+                    port: 3010,
+                    url: 'http://localhost'
+                },
+                {
+                    type: 'Broker',
+                    mode: 'LIVE',
+                    port: 3011,
+                    url: 'http://localhost'
+                }
+            ],
             kinesisOptions: {}
         },
         {
@@ -60,10 +70,20 @@ export default {
                 paper: false,
                 usePolygon: false
             },
-            webSocket: {
-                url: 'https://localhost',
-                port: 3002
-            }
+            webSocketOptions: [
+                {
+                    type: 'MarketData',
+                    mode: 'LIVE',
+                    port: 3020,
+                    url: 'http://localhost'
+                },
+                {
+                    type: 'Broker',
+                    mode: 'LIVE',
+                    port: 3021,
+                    url: 'http://localhost'
+                }
+            ]
         },
         {
             name: "Alpaca Paper",
@@ -85,9 +105,20 @@ export default {
                 paper: true,
                 usePolygon: false
             },
-            webSocketOptions: {
-                port: 3003
-            }
+            webSocketOptions: [
+                {
+                    type: 'MarketData',
+                    mode: 'LIVE',
+                    port: 3022,
+                    url: 'http://localhost'
+                },
+                {
+                    type: 'Broker',
+                    mode: 'LIVE',
+                    port: 3023,
+                    url: 'http://localhost'
+                }
+            ]
         },
     ]
 };
