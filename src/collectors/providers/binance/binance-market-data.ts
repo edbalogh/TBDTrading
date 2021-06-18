@@ -1,11 +1,10 @@
-import { Mode } from '../../../constants/types'
+import { Mode } from '../../../common/definitions/basic'
 import { MarketDataProviderBase } from '../../base/market-data-base'
-import { Bar } from '../../base/models/bar'
-import { OrderBook, BookLevel } from '../../base/models/order-book'
+import { OrderBook, BookLevel } from '../../../common/definitions/broker'
+import { Bar, HistoricalBarOptions } from '../../../common/definitions/market-data'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
-import { ProviderOptions } from '../../base/models/provider-options'
+import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../common/definitions/options'
 import { last } from 'lodash'
-import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions } from '../../base/models/options'
 import { CandlesOptions, CandleChartInterval, Candle, CandleChartResult, Depth } from 'binance-api-node'
 
 

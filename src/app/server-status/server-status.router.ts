@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { SERVER_STATUS_ENDPOINT } from '../../constants/endpoint';
+import { SERVER_STATUS_ENDPOINT } from '../../common/definitions/endpoint';
 import { getRoutes } from './server.status.service';
 
 export const router: Router = Router();

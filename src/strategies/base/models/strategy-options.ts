@@ -1,5 +1,5 @@
 import { ProviderService, Connection } from '../../../collectors/base/models/provider-options'
-import { Mode, Currency } from '../../../constants/types'
+import { Mode, Currency } from '../../../common/definitions/basic'
 
 export type StrategyStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED'
 export interface StrategyOptions {

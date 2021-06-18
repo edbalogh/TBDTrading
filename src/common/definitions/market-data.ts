@@ -12,4 +12,13 @@ export interface Bar {
     volume?: Number,
     end?: Date,
     trades?: Number
-}
+  }
+  
+  export interface HistoricalBarOptions {
+    timeframe: string,
+    symbols?: string[],
+    limit?: number,
+    afterDate?: Date,
+    startDate?: Date,
+    endDate?:  Date
+  }

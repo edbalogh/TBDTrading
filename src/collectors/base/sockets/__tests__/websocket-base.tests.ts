@@ -1,5 +1,5 @@
 import { WebSocketServerBase } from '../websocket-base'
-import { ProviderOptions } from '../../../base/models/provider-options'
+import { ProviderOptions } from '../../../../common/definitions/options'
 import { SocketTester } from 'socket.io-await-test'
 import io from 'socket.io-client'
 
@@ -16,7 +16,7 @@ afterEach(() => {
 
 let defaultOptions: ProviderOptions = {
     id: 'test', scriptLocations: [{ type: 'MarketData', location: ''}], name: 'test', supportedModes: ['BACKTEST'], apiOptions: new Map(),
-    webSocketOptions: { url: 'http://localhost', port: 3000 }
+    webSocketOptions: [{ type: 'MarketData', mode: 'LIVE', url: 'http://localhost', port: 3001 }]
 }
 
 describe("WebSocket connection/subscription management tests", () => {
@@ -116,7 +116,7 @@ describe("WebSocket connection/subscription management tests", () => {
 
 describe("WebSocket Server Start/Stop", () => {
     
-    let socketUrl = `${defaultOptions.webSocketOptions?.url}:${defaultOptions.webSocketOptions?.port}`
+    let socketUrl = 'http://localhost:3001'
     test('should start and stop a new webSocket server', async () => {
         wsServer.startServer()
         const client = io(socketUrl)

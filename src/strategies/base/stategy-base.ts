@@ -3,7 +3,8 @@ import { ProviderOptions, Connection, ProviderType } from '../../collectors/base
 import { Bar } from '../../collectors/base/models/bar'
 import { OrderBook } from '../../collectors/base/models/order-book'
 import { Order } from '../../collectors/base/models/order'
-import { Mode } from '../../constants/types'
+import { OrderExecution } from '../../collectors/base/broker-base'
+import { Mode } from '../../common/definitions/basic'
 import config from '../../../config'
 
 export abstract class StrategyBase {
@@ -111,7 +112,8 @@ export abstract class StrategyBase {
     addBrokerListener(providerOptions: ProviderOptions, location: string): void {
         const BrokerClass = require(location)
         const broker = new BrokerClass(providerOptions, this.mode)
-        broker.on(`${this.symbol?.symbol}.order`, (order: Order) => this._onOrderUpdate(order))
+        broker.on(`${this.symbol?.symbol}.orderExecution`, (order: OrderExecution) => this._onOrderExecution(order))
+        broker.on(`${this.symbol?.symbol}.orderComplete`, (order: Order) => this._onOrderComplete(order))
 
         // start listener
         broker.startSocketListener()
@@ -134,15 +136,24 @@ export abstract class StrategyBase {
         return bar
     }
 
+    async _onOrderExecution(order: OrderExecution): Promise<void> {
+        return this.onOrderExecution(order)
+    }
+
     async _onOrderUpdate(order: Order): Promise<void> {
-        this.onOrderUpdate(order)
+        return this.onOrderUpdate(order)
+    }
+
+    async _onOrderComplete(order: Order): Promise<void> {
+        return this.onOrderUpdate(order)
     }
 
     async _onOrderBookUpdate(book: OrderBook): Promise<void> {
-        this.onOrderBookUpdate(book)
+        return this.onOrderBookUpdate(book)
     }
 
     async onNextBar(bar: Bar): Promise<void> { }
-    onOrderBookUpdate(book: OrderBook): void { }
-    onOrderUpdate(order: Order): void {}
+    async onOrderBookUpdate(book: OrderBook): Promise<void> { }
+    async onOrderExecution(order: OrderExecution): Promise<void> {}
+    async onOrderUpdate(order: Order): Promise<void> {}
 }

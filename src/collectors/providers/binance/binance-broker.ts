@@ -1,7 +1,8 @@
-import { BrokerProviderBase, ExecutionType, OrderExecution, OrderStatus, OrderSide, OrderType, BrokerBalance, AccountInfo, Balance } from '../../base/broker-base'
-import { OrderSubscriptionOptions } from '../../base/sockets/broker-socket'
-import { Mode } from '../../../constants/types'
-import { ProviderOptions } from '../../base/models/provider-options'
+import { BrokerProviderBase } from '../../base/broker-base'
+import { ExecutionType, OrderExecution, OrderStatus, OrderSide, OrderType, BrokerBalance, AccountInfo, Balance} from '../../../common/definitions/broker'
+import { OrderSubscriptionOptions } from '../../../common/definitions/websocket'
+import { Mode } from '../../../common/definitions/basic'
+import { ProviderOptions } from '../../../common/definitions/options'
 import { OutboundAccountInfo, ExecutionReport, OutboundAccountPosition, BalanceUpdate, Balances } from 'binance-api-node'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
 

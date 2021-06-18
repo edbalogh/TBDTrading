@@ -2,12 +2,13 @@ import cors from 'cors'
 import express, {Express, NextFunction, Request, Response} from 'express'
 import http from 'http'
 import {Server, Socket} from 'socket.io'
-import { ProviderOptions, ProviderType, getProviderSocketOptionsByType } from '../models/provider-options'
+import { ProviderOptions, ProviderType, getProviderSocketOptionsByType } from '../../../common/definitions/options'
 import { v4 as uuid } from 'uuid'
-import { isEqual } from 'lodash'
-import { Mode } from '../../../constants/types'
+import { isEqual, last } from 'lodash'
+import { Mode } from '../../../common/definitions/basic'
+import { SubscriptionType } from '../../../common/definitions/websocket'
 
-export type SubscriptionType = 'BAR' | 'BOOK' | 'TRADE' | 'EXECUTION' | 'ACCOUNT' | 'BALANCE'
+// topics ${symbol}.bar, ${symbol}.book, ${symbol}.trade
 
 export class WebSocketServerBase {
     port: number
@@ -64,6 +65,13 @@ export class WebSocketServerBase {
             socket.on('ping', () => socket.emit('pong'))
         })        
     }
+
+    emit(topic: string, ...args: any[]) {
+        const connections = this.findConnectionsForTopic(topic, args) || []
+        this.socketServer?.to(connections).emit(topic, args)
+    }
+
+    findConnectionsForTopic(topic: string, ...args: any[]): any {}
     
     addSubscription(connectionId: string, type: SubscriptionType, options: any) {
         if (this.subscriptionExists(type, options)) {

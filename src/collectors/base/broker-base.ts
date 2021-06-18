@@ -1,6 +1,7 @@
-import { ProviderOptions, getProviderSocketOptionsByType } from './models/provider-options'
-import { BrokerSocketServer, OrderSubscriptionOptions, RequestType } from './sockets/broker-socket'
-import { Mode } from '../../constants/types'
+import { ProviderOptions, getProviderSocketOptionsByType } from '../../common/definitions/options'
+import { BrokerSocketServer } from './sockets/broker-socket'
+import { OrderSubscriptionOptions, BrokerRequestType} from '../../common/definitions/websocket'
+import { Mode } from '../../common/definitions/basic'
 import { EventEmitter } from 'events'
 import io from 'socket.io-client'
 
@@ -108,7 +109,7 @@ export abstract class BrokerProviderBase extends EventEmitter {
         this.providerServer.startServer()
 
         // register the Provider specific method to be called when a new subsription is requested
-        const eventCallbacks: Map<RequestType, Function> = new Map()
+        const eventCallbacks: Map<BrokerRequestType, Function> = new Map()
         eventCallbacks.set('addOrderSubscriptions', this.addServerOrderSubscriptions.bind(this))
         eventCallbacks.set('addAccountSubscription', this.addServerAccountSubscription.bind(this))
         eventCallbacks.set('addBalanceSubscription', this.addServerBalanceSubscription.bind(this))
@@ -170,47 +171,4 @@ export abstract class BrokerProviderBase extends EventEmitter {
     stopSocketListener() {
         this.socketClient.close()
     }
-}
-
-export type OrderStatus = 'OPEN' | 'REJECTED' | 'CLOSED' | 'CANCELED' | 'ERROR' | 'LOST' | 'FILLED' | 'PARTIALLY_FILLED'
-export type OrderSide = 'BUY' | 'SELL'
-export type TimeInForce = 'GTC' | 'IOC' | 'FOK' | 'OPG'
-export type OrderType = 'LIMIT' | 'LIMIT_MAKER' | 'MARKET' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'
-export type ExecutionType = 'NEW' | 'CANCELED' | 'REPLACED' | 'REJECTED' | 'TRADE' | 'EXPIRED'
-
-export interface OrderExecution {
-    symbol: string,
-    orderId: string,
-    brokerOrderId: string,
-    executionType: ExecutionType,
-    executionTime: Date,
-    orderType: OrderType,
-    orderTime: Date,
-    orderStatus: OrderStatus,
-    orderSide: OrderSide,
-    tif: TimeInForce,
-    executionQuantity: number,
-    totalQuantity: number,
-    executionPrice: number,
-    rejectReason?: string,
-    commission?: number,
-    commissionAsset?: string,
-    tradeId?: string
-}
-
-export interface AccountInfo {
-    lastUpdateTime: Date,
-    balances: Balance[]
-}
-
-export interface Balance {
-    asset: string,
-    total: number,
-    available: number,
-    inOrder: number
-}
-
-export interface BrokerBalance {
-    available: number,
-    locked: number
 }

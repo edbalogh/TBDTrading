@@ -1,17 +1,16 @@
 import { WebSocketServerBase } from './websocket-base'
-import { ProviderOptions } from '../models/provider-options'
-import { Mode } from '../../../constants/types'
+import { ProviderOptions } from '../../../common/definitions/options'
+import { BrokerRequestType, OrderSubscriptionOptions } from '../../../common/definitions/websocket'
+import { Mode } from '../../../common/definitions/basic'
 import { Socket } from 'socket.io'
-
-export type RequestType = 'addOrderSubscriptions' | 'addAccountSubscription' | 'addBalanceSubscription'
-export interface OrderSubscriptionOptions { symbols: string[] }
+import { last } from 'lodash'
 
 export class BrokerSocketServer extends WebSocketServerBase {
     constructor(options: ProviderOptions, mode: Mode) {
         super(options, 'Broker', mode)
     }
 
-    registerEvents(eventCallBacks: Map<RequestType, Function>) {
+    registerEvents(eventCallBacks: Map<BrokerRequestType, Function>) {
         console.log('registering events')
 
         this.socketServer?.on('connect', (socket: Socket) => {
@@ -22,7 +21,7 @@ export class BrokerSocketServer extends WebSocketServerBase {
                 this.removeConnectionFromAllSubscriptions(socket.id)
             })
 
-            socket.on('message', (requestType: RequestType, options?: OrderSubscriptionOptions) => {
+            socket.on('message', (requestType: BrokerRequestType, options?: OrderSubscriptionOptions) => {
                 console.log('received message', requestType)
                 let finalOptions;
                 switch (requestType) {
@@ -86,5 +85,19 @@ export class BrokerSocketServer extends WebSocketServerBase {
             return { status: 'started' }
         }
         return { status: 'exists' }
+    }
+
+    findConnectionsForTopic(topic: string, data: any): string[] {
+        const t = topic.split('.')
+        switch(last(t)) {
+            case 'orderExecution':
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'EXECUTION' && x.options.symbol === t[0])
+            case 'accountInfo':
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'ACCOUNT')
+            case 'brokerBalance':
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'BALANCE')
+            default:
+                return []
+        }
     }
 }

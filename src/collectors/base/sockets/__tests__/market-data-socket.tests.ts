@@ -1,19 +1,18 @@
-import { MarketDataSocketServer, RequestType } from '../market-data-socket'
-import { ProviderOptions } from '../../../base/models/provider-options'
+import { MarketDataSocketServer } from '../market-data-socket'
+import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../../common/definitions/options'
+import { MarketDataRequestType } from '../../../../common/definitions/websocket'
 import { SocketTester } from 'socket.io-await-test'
-import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../models/options'
 import io from 'socket.io-client'
-import { Socket } from 'socket.io'
 
 let wsServer: MarketDataSocketServer;
 
 const defaultOptions: ProviderOptions = {
     id: 'test', scriptLocations: [{ type: 'MarketData', location: '' }], name: 'test', supportedModes: ['BACKTEST'], apiOptions: new Map(),
-    webSocketOptions: { url: 'http://localhost', port: 3000 }
+    webSocketOptions: [{ type: 'MarketData', mode: 'LIVE', url: 'http://localhost', port: 3000 }]
 }
-const socketUrl = `${defaultOptions.webSocketOptions?.url}:${defaultOptions.webSocketOptions?.port}`
+const socketUrl = `http://localhost:3000`
 
-const callbacks: Map<RequestType, Function> = new Map()
+const callbacks: Map<MarketDataRequestType, Function> = new Map()
 const barCallback = jest.fn()
 const bookCallback = jest.fn()
 const tradeCallback = jest.fn()

@@ -1,8 +1,10 @@
-import { ProviderOptions, getProviderSocketOptionsByType } from './models/provider-options'
-import { Mode } from '../../constants/types'
-import { HistoricalBarOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from './models/options'
+import { ProviderOptions, getProviderSocketOptionsByType } from '../../common/definitions/options'
+import { Mode } from '../../common/definitions/basic'
+import { HistoricalBarOptions } from '../../common/definitions/market-data'
 import { EventEmitter } from 'events'
-import { MarketDataSocketServer, RequestType } from './sockets/market-data-socket'
+import { MarketDataSocketServer } from './sockets/market-data-socket'
+import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../common/definitions/options'
+import { MarketDataRequestType } from '../../common/definitions/websocket'
 import io from 'socket.io-client'
 
 export abstract class MarketDataProviderBase extends EventEmitter {
@@ -155,7 +157,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
         this.providerServer.startServer()
 
         // register the Provider specific method to be called when a new subsription is requested
-        const eventCallbacks: Map<RequestType, Function> = new Map()
+        const eventCallbacks: Map<MarketDataRequestType, Function> = new Map()
         eventCallbacks.set('addBarSubscriptions', this.addServerBarSubscription.bind(this))
         eventCallbacks.set('addBookSubscriptions', this.addServerBookSubscription.bind(this))
         eventCallbacks.set('addTradeSubscriptions', this.addServerTradeSubscription.bind(this))

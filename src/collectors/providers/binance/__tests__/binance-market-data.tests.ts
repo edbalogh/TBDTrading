@@ -2,8 +2,8 @@ import { buildHistoricalBar } from '../__data__/historicalBars'
 import { buildLiveBar } from '../__data__/liveBars'
 import { buildLiveOrderBook } from '../__data__/liveOrderBook'
 import { EventEmitter } from "events"
-import { Bar } from "../../../base/models/bar"
-import { ProviderOptions } from '../../../base/models/provider-options'
+import { Bar } from "../../../../common/definitions/market-data"
+import { ProviderOptions } from '../../../../common/definitions/options'
 const BinanceMarketData = require('../binance-market-data')
 
 const Events = new EventEmitter()

@@ -1,17 +1,18 @@
 import { WebSocketServerBase } from './websocket-base'
-import { ProviderOptions } from '../models/provider-options'
-import { Mode } from '../../../constants/types'
+import { ProviderOptions } from '../../../common/definitions/options'
+import { Bar } from '../../../common/definitions/market-data'
+import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../common/definitions/options'
+import { MarketDataRequestType } from '../../../common/definitions/websocket'
+import { Mode } from '../../../common/definitions/basic'
 import { Socket } from 'socket.io'
-import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../models/options'
-
-export type RequestType = 'addBarSubscriptions' | 'addTradeSubscriptions' | 'addBookSubscriptions'
+import { last } from 'lodash'
 
 export class MarketDataSocketServer extends WebSocketServerBase {
     constructor(options: ProviderOptions, mode: Mode) {
         super(options, 'MarketData', mode)
     }
 
-    registerEvents(eventCallBacks: Map<RequestType, Function>) {
+    registerEvents(eventCallBacks: Map<MarketDataRequestType, Function>) {
 
         console.log('registering events')
 
@@ -23,7 +24,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
                 this.removeConnectionFromAllSubscriptions(socket.id)
             })
 
-            socket.on('message', (requestType: RequestType, options: LiveBarOptions | LiveOrderBookOptions | LiveTradeOptions) => {
+            socket.on('message', (requestType: MarketDataRequestType, options: LiveBarOptions | LiveOrderBookOptions | LiveTradeOptions) => {
                 console.log('received message', requestType)
                 let finalOptions;
                 switch (requestType) {
@@ -51,7 +52,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         if (!cb) throw new Error('no callback found for addBarSubscriptions event')
         console.log(`registering new bar subscription for connection ${connectionId}`)
         const newSymbols: string[] = []
-        options.symbols.map(s => {
+        options.symbols.map((s:string) => {
             const subOptions = { symbols: s, timeframe: options.timeframe }
             if (!this.subscriptionExists('BAR', subOptions)) newSymbols.push(s)
             this.addSubscription(connectionId, 'BAR', subOptions)
@@ -71,7 +72,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         console.log(`registering new order book subscriptions for connection ${connectionId}`)
         const newSymbols: string[] = []
         
-        options.symbols.forEach(s => {
+        options.symbols.forEach( (s:string) => {
             const subOptions = { symbol: s }
             if (!this.subscriptionExists('BOOK', subOptions)) newSymbols.push(s)
             this.addSubscription(connectionId, 'BOOK', subOptions)
@@ -90,7 +91,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         if (!cb) throw new Error('no callback found for addTradeSubscriptions event')
         console.log(`registering new trade subscriptions for connection ${connectionId}`)
         const newSymbols: string[] = []
-        options.symbols.map(s => {
+        options.symbols.map( (s: string) => {
             const subOptions = { symbol: s }
             if (!this.subscriptionExists('TRADE', subOptions)) newSymbols.push(s)
             this.addSubscription(connectionId, 'TRADE', subOptions)
@@ -103,5 +104,19 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         }
 
         return newOptions
+    }
+
+    findConnectionsForTopic(topic: string, data: any): string[] {
+        const t = topic.split('.')
+        switch(last(t)) {
+            case 'bar':
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'BAR' && x.options.symbol === t[0] && x.options.timeframe === <Bar>data.timeframe)
+            case 'book':
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'BOOK' && x.options.symbol === t[0])
+            case 'trade':
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'BOOK' && x.options.symbol === t[0])
+            default:
+                return []
+        }
     }
 }

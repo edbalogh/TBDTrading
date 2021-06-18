@@ -1,4 +1,4 @@
-import { Mode } from '../../../constants/types'
+import { Mode } from './basic'
 
 export type ProviderType = 'Broker' | 'MarketData' | 'Other'
 export type ConnectionStatus = 'PENDING' | 'DISCONNECTED' | 'CONNECTED' | 'RECONNECTING' | 'ERROR' | 'ACTIVE'
@@ -73,4 +73,17 @@ export function getProviderSocketOptionsByType(options: ProviderOptions, type: P
     return options.webSocketOptions?.find(x => x.type === type && x.mode === mode)
 }
 
+export interface LiveBarOptions {
+    symbols: string[],
+    timeframe?: string,
+    showActive?: boolean
+}
+
+export interface LiveOrderBookOptions {
+    symbols: string[]
+}
+
+export interface LiveTradeOptions {
+    symbols: string[]
+}
 
