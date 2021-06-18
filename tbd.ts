@@ -1,8 +1,8 @@
 #!/usr/bin/env ts-node
 
-import { OrderBook } from './src/collectors/base/models/order-book';
+import { OrderBook } from './src/common/definitions/broker';
 import yargs, { Argv } from 'yargs'
-import { ProviderOptions } from './src/collectors/base/models/provider-options'
+import { ProviderOptions } from './src/common/definitions/options'
 import config from './config'
 const BinanceMarketData = require('./src/collectors/providers/binance/binance-market-data')
 import { Execution } from './src/strategies/base/models/strategy-options';
