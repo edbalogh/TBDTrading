@@ -1,9 +1,7 @@
 import { Execution, SymbolDetails } from '../base/models/strategy-options'
-import { ProviderOptions, Connection, ProviderType } from '../../collectors/base/models/provider-options'
-import { Bar } from '../../collectors/base/models/bar'
-import { OrderBook } from '../../collectors/base/models/order-book'
-import { Order } from '../../collectors/base/models/order'
-import { OrderExecution } from '../../collectors/base/broker-base'
+import { ProviderOptions, Connection, ProviderType } from '../../common/definitions/options'
+import { Bar } from '../../common/definitions/market-data'
+import { OrderBook, Order, OrderExecution } from '../../common/definitions/broker'
 import { Mode } from '../../common/definitions/basic'
 import config from '../../../config'
 

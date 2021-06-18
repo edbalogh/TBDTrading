@@ -1,5 +1,5 @@
 import { Execution, SymbolDetails } from '../base/models/strategy-options'
-import { OrderBook } from '../../collectors/base/models/order-book'
+import { OrderBook } from '../../common/definitions/broker'
 import { StrategyBase } from '../base/stategy-base'
 
 export class BasicArbitrage extends StrategyBase {
