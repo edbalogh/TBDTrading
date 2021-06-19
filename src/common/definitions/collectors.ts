@@ -1,4 +1,4 @@
-import { Mode } from './basic'
+import { Mode, Currency } from './basic'
 
 export type ProviderType = 'Broker' | 'MarketData' | 'Other'
 export type ConnectionStatus = 'PENDING' | 'DISCONNECTED' | 'CONNECTED' | 'RECONNECTING' | 'ERROR' | 'ACTIVE'
@@ -86,4 +86,3 @@ export interface LiveOrderBookOptions {
 export interface LiveTradeOptions {
     symbols: string[]
 }
-

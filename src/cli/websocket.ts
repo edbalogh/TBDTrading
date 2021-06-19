@@ -1,5 +1,5 @@
 import { Argv } from 'yargs'
-import { ProviderOptions } from '../common/definitions/options'
+import { ProviderOptions } from '../common/definitions/collectors'
 import config from '../../config'
 const BinanceMarketData = require('../collectors/providers/binance/binance-market-data')
 const BinanceBroker = require('../collectors/providers/binance/binance-broker')

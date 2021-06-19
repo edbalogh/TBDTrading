@@ -1,5 +1,5 @@
-import { Execution, SymbolDetails } from '../base/models/strategy-options'
-import { OrderBook } from '../../common/definitions/broker'
+import { BotDetails, SymbolDetails } from '../../common/definitions/strategy'
+import { OrderBook } from '../../common/definitions/market-data'
 import { StrategyBase } from '../base/stategy-base'
 
 export class BasicArbitrage extends StrategyBase {
@@ -8,7 +8,7 @@ export class BasicArbitrage extends StrategyBase {
     total: number = 0
     tradeCount: number = 0
 
-    constructor(options: Execution, symbolDetails: SymbolDetails) {
+    constructor(options: BotDetails, symbolDetails: SymbolDetails) {
         super(options, symbolDetails)
     }
 

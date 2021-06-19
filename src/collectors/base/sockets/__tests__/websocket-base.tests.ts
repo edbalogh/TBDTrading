@@ -1,5 +1,5 @@
 import { WebSocketServerBase } from '../websocket-base'
-import { ProviderOptions } from '../../../../common/definitions/options'
+import { ProviderOptions } from '../../../../common/definitions/collectors'
 import { SocketTester } from 'socket.io-await-test'
 import io from 'socket.io-client'
 

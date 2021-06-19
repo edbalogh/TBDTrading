@@ -1,9 +1,17 @@
 export type OrderStatus = 'OPEN' | 'REJECTED' | 'CLOSED' | 'CANCELED' | 'ERROR' | 'LOST' | 'FILLED' | 'PARTIALLY_FILLED'
 export type OrderSide = 'BUY' | 'SELL'
 export type TimeInForce = 'GTC' | 'IOC' | 'FOK' | 'OPG'
-export type OrderType = 'LIMIT' | 'LIMIT_MAKER' | 'MARKET' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT'
+export type OrderType = 'LIMIT' | 'LIMIT_MAKER' | 'MARKET' | 'STOP_LOSS' | 'STOP_LOSS_LIMIT' | 'TAKE_PROFIT' | 'TAKE_PROFIT_LIMIT' | 'BRACKET'
 export type ExecutionType = 'NEW' | 'CANCELED' | 'REPLACED' | 'REJECTED' | 'TRADE' | 'EXPIRED'
 export type OrderFillStatus = 'NONE' | 'PARTIAL' | 'FULL'
+
+export type BrokerStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED'
+export interface BrokerOptions {
+    id: string,
+    name: string,
+    class: string,
+    parameterDetails: Map<string, any>    
+}
 
 export interface OrderExecution {
     symbol: string,
@@ -42,25 +50,27 @@ export interface BrokerBalance {
     locked: number
 }
 
-export interface OrderBook {
-    providerId: string,
-    source: string,
-    eventTime: Date,
+export interface OrderRequest {
+    id?: string,
+    botId?: string,
     symbol: string,
-    bids: BookLevel[],
-    asks: BookLevel[]
+    currency?: string,
+    side: OrderSide,
+    type: OrderType,
+    tif?: TimeInForce,
+    limitPrice?: number,
+    stopPrice?: number,
+    stopLimitPrice?: number,
+    requestedAmount?: number,
+    requestedShares?: number,
+    isExit: boolean
 }
-
-export interface BookLevel {
-    price: number,
-    quantity: number
-}
-
 
 export interface Order {
     id: string,
+    botId: number,
     symbol: string,
-    base: string,
+    currency: string,
     side: OrderSide,
     type: OrderType,
     tif: TimeInForce,
@@ -72,4 +82,11 @@ export interface Order {
     sharesFilled?: Number,
     lastFillPrice?: Number,
     avgFillPrice?: Number
+}
+
+export interface Position {
+    botId: string,
+    symbol: string,
+    currentShares: number,  // negative is short, positive is long
+    sharesOnOrder: number
 }

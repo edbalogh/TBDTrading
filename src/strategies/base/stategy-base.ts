@@ -1,26 +1,43 @@
-import { Execution, SymbolDetails } from '../base/models/strategy-options'
-import { ProviderOptions, Connection, ProviderType } from '../../common/definitions/options'
-import { Bar } from '../../common/definitions/market-data'
-import { OrderBook, Order, OrderExecution } from '../../common/definitions/broker'
+import { ProviderOptions, Connection, ProviderType } from '../../common/definitions/collectors'
+import { BotDetails, SymbolDetails } from '../../common/definitions/strategy'
+import { Bar, OrderBook } from '../../common/definitions/market-data'
+import { Order, OrderExecution, Position, OrderRequest } from '../../common/definitions/broker'
 import { Mode } from '../../common/definitions/basic'
 import config from '../../../config'
+import { BrokerProviderBase } from '../../collectors/base/broker-base'
+import { MarketDataProviderBase } from '../../collectors/base/market-data-base'
 
 export abstract class StrategyBase {
-    execution: Execution
+    botDetails: BotDetails
     symbol: SymbolDetails
     connections: any = []
     name: string
     mode: Mode
+    position?: Position
+    activeOrders: Order[] = []
+    brokerProvider: any
 
-    constructor(execution: Execution, symbolDetails: SymbolDetails) {
-        this.execution = execution
-        this.mode = execution.mode
+    constructor(botDetails: BotDetails, symbolDetails: SymbolDetails) {
+        this.botDetails = botDetails
+        this.mode = botDetails.mode
         this.symbol = symbolDetails
-        this.name = this.execution.name
+        this.name = this.botDetails.name
+        this.brokerProvider = this.buildBrokerClass()
+    }
+
+    buildBrokerClass() {
+        const broker = this.botDetails.providers.find(p => p.providerType === 'Broker')
+        if (!broker) throw new Error (`failed to load Broker for bot ${this.name}, missing Broker in providers section`)
+        const provider = config.providers.find(p => p.id === broker.providerId)
+        if (!provider) throw new Error (`failed to load Broker for bot ${this.name}, missing providerId in config`)
+        const script = provider.scriptLocations.find(l => l.type === 'Broker')
+        if (!script) throw new Error(`failed to load Broker for ${this.name}, missing Broker in scriptLocations`)
+        const BrokerProvider = require(`${script.location}`)
+        this.brokerProvider = new BrokerProvider(provider, this.mode)
     }
 
     startup(): void {
-        this.execution.providers.map(p => {
+        this.botDetails.providers.map(p => {
             const lookup = config.providers.find(x => x.id === p.providerId)
             let providerOptions: ProviderOptions
 
@@ -63,7 +80,7 @@ export abstract class StrategyBase {
         md.on(`${this.symbol?.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
         md.on(`${this.symbol?.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
 
-        this.execution.symbols.filter(s => {
+        this.botDetails.symbols.filter(s => {
             if (s.reference) {
                 md.on(`${s.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
                 md.on(`${s.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
@@ -120,6 +137,12 @@ export abstract class StrategyBase {
 
     addOtherListener(providerOptions: ProviderOptions, location: string): void { }
 
+
+    async placeOrder(orderRequest: OrderRequest) {
+        this.brokerProvider.placeOrder(orderRequest)
+    }
+
+
     /**
      * Prep bar before sending to child strategy
      * @param bar bar data from market data event
@@ -130,7 +153,7 @@ export abstract class StrategyBase {
     }
 
     addBarIndicators(bar: Bar): Bar {
-        // update indicators
+        // update indicators, needs to happen here since indicators are different per strategy
         return bar
     }
 

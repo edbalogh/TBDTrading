@@ -1,9 +1,8 @@
-import { ProviderOptions, getProviderSocketOptionsByType } from '../../common/definitions/options'
+import { ProviderOptions, getProviderSocketOptionsByType, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../common/definitions/collectors'
 import { Mode } from '../../common/definitions/basic'
-import { HistoricalBarOptions } from '../../common/definitions/market-data'
+import { HistoricalBarOptions, Bar } from '../../common/definitions/market-data'
 import { EventEmitter } from 'events'
 import { MarketDataSocketServer } from './sockets/market-data-socket'
-import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../common/definitions/options'
 import { MarketDataRequestType } from '../../common/definitions/websocket'
 import io from 'socket.io-client'
 
@@ -136,6 +135,11 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     getLiveBarData(options: LiveBarOptions) {
         this.subscriptionHistory.push({topic: 'addBarSubscriptions', options})     
         this.socketClient.send('addBarSubscriptions', options)
+    }
+
+    addBarIndicators(bar: Bar): Bar {
+        // update indicators
+        return bar
     }
 
     /**

@@ -1,9 +1,10 @@
-import { ProviderOptions, getProviderSocketOptionsByType } from '../../common/definitions/options'
+import { ProviderOptions, getProviderSocketOptionsByType } from '../../common/definitions/collectors'
 import { BrokerSocketServer } from './sockets/broker-socket'
-import { OrderSubscriptionOptions, BrokerRequestType} from '../../common/definitions/websocket'
+import { OrderSubscriptionOptions, BrokerRequestType } from '../../common/definitions/websocket'
 import { Mode } from '../../common/definitions/basic'
 import { EventEmitter } from 'events'
 import io from 'socket.io-client'
+import { OrderRequest, Order } from '../../common/definitions/broker'
 
 export abstract class BrokerProviderBase extends EventEmitter {
     id: string
@@ -15,7 +16,7 @@ export abstract class BrokerProviderBase extends EventEmitter {
     socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
     providerServer?: BrokerSocketServer
     subscriptionHistory: any[] = []
-    
+
     constructor(options: ProviderOptions, mode: Mode, client: any) {
         super()
         if (!options.supportedModes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
@@ -29,7 +30,7 @@ export abstract class BrokerProviderBase extends EventEmitter {
     static parameterDetails() {
         return {
             provider: {
-                label: { text: "Provider"}, editorOptions: { disabled: true }
+                label: { text: "Provider" }, editorOptions: { disabled: true }
             },
             pdtEnabled: {
                 type: 'checkbox',
@@ -94,6 +95,8 @@ export abstract class BrokerProviderBase extends EventEmitter {
         }
     }
 
+    async initialize() {}
+
     /**
      * generic emitter that will either send to a websocket or local based on setup
      * @param event event that is being sent out
@@ -103,7 +106,11 @@ export abstract class BrokerProviderBase extends EventEmitter {
         this.providerServer ? this.providerServer.socketServer?.emit(event, data) : this.emit(event, data)
     }
 
+
+
+    /////////////////////    
     // WebSocket Server
+
     startSocketServer() {
         this.providerServer = new BrokerSocketServer(this.options, this.mode)
         this.providerServer.startServer()
@@ -124,34 +131,38 @@ export abstract class BrokerProviderBase extends EventEmitter {
     }
 
     getLiveAccountData() {
-        this.subscriptionHistory.push({topic: 'addAccountSubscription'})     
+        this.subscriptionHistory.push({ topic: 'addAccountSubscription' })
         this.socketClient.send('addAccountSubscription')
     }
 
     getLiveOrderExecutionData() {
-        this.subscriptionHistory.push({topic: 'addOrderSubscriptions'})     
+        this.subscriptionHistory.push({ topic: 'addOrderSubscriptions' })
         this.socketClient.send('addOrderSubscriptions')
     }
-    
+
     // method to add the bar subscription to the local server
     addServerOrderSubscriptions(options: OrderSubscriptionOptions) {
-        this.addProviderOrderSubscriptions(options)    
+        this.addProviderOrderSubscriptions(options)
     }
-        
+
     addServerBalanceSubscription() {
-        this.addProviderBalanceSubscriptions()    
+        this.addProviderBalanceSubscriptions()
     }
 
     addServerAccountSubscription() {
         this.addProviderAccountSubscriptions()
     }
-    
-    // implement on provider class, registers for a new bar
-    addProviderOrderSubscriptions(options: OrderSubscriptionOptions): any {}
-    addProviderAccountSubscriptions(): any {}
-    addProviderBalanceSubscriptions(): any {}
 
+    // implement on provider class, registers for a new bar
+    abstract addProviderOrderSubscriptions(options: OrderSubscriptionOptions): any
+    abstract addProviderAccountSubscriptions(): any
+    abstract addProviderBalanceSubscriptions(): any
+
+
+
+    //////////////////////
     // WebSocket Listener
+    
     startSocketListener() {
         const wsOptions = getProviderSocketOptionsByType(this.options, 'Broker', this.mode)
         const port = wsOptions ? wsOptions.port : 3000
@@ -170,5 +181,18 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     stopSocketListener() {
         this.socketClient.close()
+    }
+
+
+
+    /////////////////////
+    // Order Handling
+
+    abstract buildBrokerOrderFromRequest(orderRequest: OrderRequest): any
+    abstract placeBrokerOrder(brokerOrder: any): void
+
+    async placeOrder(orderRequest: OrderRequest) {
+        const brokerOrder = this.buildBrokerOrderFromRequest(orderRequest)
+        return this.placeBrokerOrder(brokerOrder)
     }
 }

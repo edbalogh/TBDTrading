@@ -1,5 +1,5 @@
 import { WebSocketServerBase } from './websocket-base'
-import { ProviderOptions } from '../../../common/definitions/options'
+import { ProviderOptions } from '../../../common/definitions/collectors'
 import { BrokerRequestType, OrderSubscriptionOptions } from '../../../common/definitions/websocket'
 import { Mode } from '../../../common/definitions/basic'
 import { Socket } from 'socket.io'

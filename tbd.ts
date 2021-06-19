@@ -2,7 +2,7 @@
 
 import { OrderBook } from './src/common/definitions/broker';
 import yargs, { Argv } from 'yargs'
-import { ProviderOptions } from './src/common/definitions/options'
+import { ProviderOptions } from './src/common/definitions/collectors'
 import config from './config'
 const BinanceMarketData = require('./src/collectors/providers/binance/binance-market-data')
 import { Execution } from './src/strategies/base/models/strategy-options';
