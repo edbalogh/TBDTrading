@@ -7,8 +7,17 @@ export function startExampleBot(yargs: Argv) {
             alias: 'b',
             type: 'string'
         })
-        .argv
+        .argv  
 
-    const Bot = require('../../../src/strategies/examples/${bot}')
-    const bot = new Bot()
+    const botDetails = require(`./bot-details/${options.bot}`)
+    const Bot = require(`../../../src/strategies/examples/${botDetails.strategyOptions.class}`)
+    const bot = new Bot(botDetails, botDetails.symbols[0])
+
+    process.on('SIGINT', function () {
+        console.log("Caught interrupt signal, closing bot");
+        bot.stopMarketDataStream()
+        process.exit();
+    });  
+
+    bot.startUp()
 }

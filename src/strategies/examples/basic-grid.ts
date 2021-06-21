@@ -12,6 +12,7 @@ export class BasicGrid extends StrategyBase {
     }
 
     async onOrderUpdate(order: Order) {
+        console.log(order)
        // TODO: when order has been filled, place order on opposite side at next level
     }
 
