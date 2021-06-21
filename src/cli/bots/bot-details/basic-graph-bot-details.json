@@ -1,0 +1,57 @@
+{
+    "id": "bgtst1",
+    "name": "bgrid-binance-test",
+    "mode": "LIVE",
+    "status": "ACTIVE",
+    "providers": [
+        {
+            "providerId": "binance",
+            "providerType": "MarketData",
+            "subscriptions": [
+                {
+                    "type": "BAR",
+                    "options": {
+                        "timeframe": "1h",
+                        "showActive": true
+                    }
+                },
+                {
+                    "type": "BOOK",
+                    "options": {}
+                }
+            ]
+        },
+        {
+            "providerId": "binance",
+            "providerType": "Broker",
+            "subscriptions": [
+                {
+                    "type": "ORDER"
+                }
+            ]
+        }
+    ],
+    "symbols": [
+        {
+            "symbol": "ADAUSDT",
+            "status": "ACTIVE",
+            "providerId": "binance",
+            "reference": false,
+            "pair": [ "ADA", "USDT" ]
+        }
+    ],
+    "baseCurrency": "USDT",
+    "promotedFrom": "cli",
+    "strategyOptions": {
+        "id": "basic-grid",
+        "name": "basic-grid",
+        "class": "basic-grid",
+        "parameterDetails": {},
+        "orderSizeOptions": {
+            "supportsFractionalShares": true,
+            "tradeSizeAmount": 25,
+            "maxCapitalPerSymbol": 100,
+            "maxCapitalPerStrategy": 500
+        }
+    }
+}

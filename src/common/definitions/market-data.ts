@@ -1,3 +1,6 @@
+import { LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from "./connectors";
+import { SubscriptionType } from "./websocket";
+
 export interface Bar {
     providerId: string,
     start: Date,
@@ -37,4 +40,3 @@ export interface BookLevel {
   price: number,
   quantity: number
 }
-

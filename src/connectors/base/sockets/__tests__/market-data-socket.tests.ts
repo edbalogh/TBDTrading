@@ -1,5 +1,5 @@
 import { MarketDataSocketServer } from '../market-data-socket'
-import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../../common/definitions/collectors'
+import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../../common/definitions/connectors'
 import { MarketDataRequestType } from '../../../../common/definitions/websocket'
 import { SocketTester } from 'socket.io-await-test'
 import io from 'socket.io-client'

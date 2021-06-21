@@ -1,28 +1,39 @@
-import { ProviderOptions, Connection, ProviderType } from '../../common/definitions/collectors'
-import { BotDetails, SymbolDetails } from '../../common/definitions/strategy'
+import { ProviderOptions, Connection, ProviderType, ProviderService, MarketDataSubscriptionRequest, BrokerSubscriptionRequest } from '../../common/definitions/connectors'
+import { BotDetails, OrderSizeOptions, SymbolDetails } from '../../common/definitions/strategy'
 import { Bar, OrderBook } from '../../common/definitions/market-data'
-import { Order, OrderExecution, Position, OrderRequest } from '../../common/definitions/broker'
-import { Mode } from '../../common/definitions/basic'
+import { Order, Position, OrderRequest } from '../../common/definitions/broker'
+import { Currency, Mode } from '../../common/definitions/basic'
 import config from '../../../config'
-import { BrokerProviderBase } from '../../collectors/base/broker-base'
-import { MarketDataProviderBase } from '../../collectors/base/market-data-base'
+import { findOne, insertOne, upsert } from '../../mongo/mongo-utils'
+const utils = require('../../utils/legacy')
+
+import { generate as shortid } from 'shortid'
+import { OrderSizeCalculator } from './order-size-calculator'
 
 export abstract class StrategyBase {
     botDetails: BotDetails
     symbol: SymbolDetails
     connections: any = []
+    botId: string
     name: string
     mode: Mode
     position?: Position
     activeOrders: Order[] = []
+    pendingOrderRequests: OrderRequest[] = []
     brokerProvider: any
+    supportsFractionalShares: boolean = false
+    orderSizeCalculator: OrderSizeCalculator
+    orderSizeOptions: OrderSizeOptions
 
     constructor(botDetails: BotDetails, symbolDetails: SymbolDetails) {
         this.botDetails = botDetails
+        this.botId = botDetails.id
         this.mode = botDetails.mode
         this.symbol = symbolDetails
         this.name = this.botDetails.name
         this.brokerProvider = this.buildBrokerClass()
+        this.orderSizeOptions = botDetails.strategyOptions.orderSizeOptions
+        this.orderSizeCalculator = new OrderSizeCalculator(this.botId, this.orderSizeOptions)
     }
 
     buildBrokerClass() {
@@ -53,13 +64,13 @@ export abstract class StrategyBase {
 
                 switch (providerScript.type) {
                     case 'MarketData':
-                        this.addMarketDataListener(providerOptions, providerScript.location)
+                        this.addMarketDataListener(providerOptions, providerScript.location, p.subscriptions)
                         break
                     case 'Broker':
-                        this.addBrokerListener(providerOptions, providerScript.location)
+                        this.addBrokerListener(providerOptions, providerScript.location, p.subscriptions)
                         break
                     default:
-                        this.addOtherListener(providerOptions, providerScript.location)
+                        this.addOtherListener(providerOptions, providerScript.location, p.subscriptions)
                 }
             } else {
                 throw new Error(`found provider ${p.providerId}, but scriptLocation for MarketData either does not exist or contains an invalid path`)
@@ -74,13 +85,13 @@ export abstract class StrategyBase {
         }))
     }
 
-    addMarketDataListener(providerOptions: ProviderOptions, location: string): void {
+    addMarketDataListener(providerOptions: ProviderOptions, location: string, subscriptions: MarketDataSubscriptionRequest[] | undefined): void {
         const MarketDataClass = require(location)
         const md = new MarketDataClass(providerOptions, this.mode)
         md.on(`${this.symbol?.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
         md.on(`${this.symbol?.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
 
-        this.botDetails.symbols.filter(s => {
+        this.botDetails.symbols.forEach(s => {
             if (s.reference) {
                 md.on(`${s.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
                 md.on(`${s.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
@@ -88,8 +99,7 @@ export abstract class StrategyBase {
         })
 
         // start listener
-        md.startSocketListener()
-
+        md.startSocketListener(subscriptions)
         this.connections.push({ class: md, options: providerOptions })
     }
 
@@ -124,24 +134,33 @@ export abstract class StrategyBase {
         return connection
     }
 
-    addBrokerListener(providerOptions: ProviderOptions, location: string): void {
+    addBrokerListener(providerOptions: ProviderOptions, location: string, subscriptions: BrokerSubscriptionRequest[] | undefined): void {
         const BrokerClass = require(location)
         const broker = new BrokerClass(providerOptions, this.mode)
-        broker.on(`${this.symbol?.symbol}.orderExecution`, (order: OrderExecution) => this._onOrderExecution(order))
+        broker.on(`${this.symbol?.symbol}.orderUpdate`, (order: Order) => this._onOrderUpdate(order))
         broker.on(`${this.symbol?.symbol}.orderComplete`, (order: Order) => this._onOrderComplete(order))
 
         // start listener
-        broker.startSocketListener()
+        broker.startSocketListener(subscriptions)
         this.connections.push({ class: broker, options: providerOptions })
+        return
     }
 
-    addOtherListener(providerOptions: ProviderOptions, location: string): void { }
-
+    addOtherListener(providerOptions: ProviderOptions, location: string, subscriptions: any): void { }
 
     async placeOrder(orderRequest: OrderRequest) {
+        orderRequest.botId = this.botId
+        orderRequest.id = `${this.botId}-${shortid()}`
+        orderRequest.currency = orderRequest.currency || this.botDetails.baseCurrency
+        orderRequest.tif = orderRequest.tif || 'GTC'
+
+        const lastPrice = await this.getLastBrokerTrade(orderRequest.symbol)
+        const availableCapital = await this.getAvailableCapital(orderRequest.currency || this.botDetails.baseCurrency);
+        this.orderSizeCalculator.calculateOrderSize(orderRequest, lastPrice, availableCapital)
+        this.pendingOrderRequests.push(orderRequest)
+
         this.brokerProvider.placeOrder(orderRequest)
     }
-
 
     /**
      * Prep bar before sending to child strategy
@@ -157,15 +176,14 @@ export abstract class StrategyBase {
         return bar
     }
 
-    async _onOrderExecution(order: OrderExecution): Promise<void> {
-        return this.onOrderExecution(order)
-    }
-
     async _onOrderUpdate(order: Order): Promise<void> {
-        return this.onOrderUpdate(order)
-    }
-
-    async _onOrderComplete(order: Order): Promise<void> {
+        this.activeOrders = this.activeOrders.filter(o =>  o.id !== order.id)
+        if (['LOST', 'REJECTED'].includes(order.status)) {
+            this.pendingOrderRequests = this.pendingOrderRequests.filter(r => r.id !== order.id)
+        } else if(['OPEN', 'PARTIALLY_FILLED', 'FILLED'].includes(order.status)) {
+            this.activeOrders.push(order)
+        }
+   
         return this.onOrderUpdate(order)
     }
 
@@ -173,8 +191,20 @@ export abstract class StrategyBase {
         return this.onOrderBookUpdate(book)
     }
 
-    async onNextBar(bar: Bar): Promise<void> { }
-    async onOrderBookUpdate(book: OrderBook): Promise<void> { }
-    async onOrderExecution(order: OrderExecution): Promise<void> {}
+    async _onOrderComplete(order: Order): Promise<void> {
+        return this.onOrderUpdate(order)
+    }
+
+    async onOrderComplete(order: Order): Promise<void> {}
+    async onNextBar(bar: Bar): Promise<void> {}
+    async onOrderBookUpdate(book: OrderBook): Promise<void> {}
     async onOrderUpdate(order: Order): Promise<void> {}
+
+    async getLastBrokerTrade(symbol: string): Promise<number> {
+        throw new Error(`getLastBrokerTrade() function not implemented!`);
+    }
+
+    async getAvailableCapital(currency: Currency): Promise<number> {
+        throw new Error(`required method getAvailableCapital() not implemented for broker`);
+    }
 }

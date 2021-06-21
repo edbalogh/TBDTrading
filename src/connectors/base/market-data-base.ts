@@ -1,4 +1,4 @@
-import { ProviderOptions, getProviderSocketOptionsByType, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../common/definitions/collectors'
+import { ProviderOptions, getProviderSocketOptionsByType, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions, MarketDataSubscriptionRequest } from '../../common/definitions/connectors'
 import { Mode } from '../../common/definitions/basic'
 import { HistoricalBarOptions, Bar } from '../../common/definitions/market-data'
 import { EventEmitter } from 'events'
@@ -182,7 +182,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
         this.addProviderBookSubscriptions(options)
     }
 
-    addServerTradeSubscription(options: LiveBarOptions) {
+    addServerTradeSubscription(options: LiveTradeOptions) {
         this.addProviderTradeSubscriptions(options)    
     }
 
@@ -193,7 +193,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
 
 
     // WebSocket Listener
-    startSocketListener() {
+    startSocketListener(subscriptions: MarketDataSubscriptionRequest[]) {
         const wsOptions = getProviderSocketOptionsByType(this.options, 'MarketData', this.mode)
         const port = wsOptions ? wsOptions.port : 3000
         const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
@@ -203,6 +203,19 @@ export abstract class MarketDataProviderBase extends EventEmitter {
         })
 
         this.socketClient.on('connect', () => {
+            subscriptions.forEach((s: MarketDataSubscriptionRequest) => {
+                switch(s.type) {
+                    case 'BAR':
+                        this.addProviderBarSubscriptions(s.options)
+                        break
+                    case 'BOOK':
+                        this.addProviderBookSubscriptions(s.options)
+                        break
+                    case 'TRADE':
+                        this.addProviderTradeSubscriptions(s.options)
+                        break
+                }
+            })
             this.subscriptionHistory.forEach(h => {
                 this.socketClient.send(h.topic, h.options)
             })

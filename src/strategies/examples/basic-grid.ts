@@ -7,7 +7,7 @@ export class BasicGrid extends StrategyBase {
     desiredLevels: number = 2
     minGapPct: number = 0.5
 
-    constructor(options: BotDetails, symbolDetails: SymbolDetails,) {
+    constructor(options: BotDetails, symbolDetails: SymbolDetails) {
         super(options, symbolDetails)
     }
 

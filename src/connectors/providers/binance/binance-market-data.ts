@@ -2,7 +2,7 @@ import { Mode } from '../../../common/definitions/basic'
 import { MarketDataProviderBase } from '../../base/market-data-base'
 import { Bar, HistoricalBarOptions, OrderBook, BookLevel } from '../../../common/definitions/market-data'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
-import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../common/definitions/collectors'
+import { ProviderOptions, LiveBarOptions, LiveOrderBookOptions, LiveTradeOptions } from '../../../common/definitions/connectors'
 import { last } from 'lodash'
 import { CandlesOptions, CandleChartInterval, Candle, CandleChartResult, Depth } from 'binance-api-node'
 

@@ -1,10 +1,10 @@
-import { ProviderOptions, getProviderSocketOptionsByType } from '../../common/definitions/collectors'
+import { ProviderOptions, getProviderSocketOptionsByType, OrderSubscriptionOptions, BrokerSubscriptionRequest } from '../../common/definitions/connectors'
 import { BrokerSocketServer } from './sockets/broker-socket'
-import { OrderSubscriptionOptions, BrokerRequestType } from '../../common/definitions/websocket'
-import { Mode } from '../../common/definitions/basic'
+import { BrokerRequestType } from '../../common/definitions/websocket'
+import { Mode, Currency } from '../../common/definitions/basic'
 import { EventEmitter } from 'events'
 import io from 'socket.io-client'
-import { OrderRequest, Order } from '../../common/definitions/broker'
+import { OrderRequest, AccountInfo } from '../../common/definitions/broker'
 
 export abstract class BrokerProviderBase extends EventEmitter {
     id: string
@@ -106,7 +106,12 @@ export abstract class BrokerProviderBase extends EventEmitter {
         this.providerServer ? this.providerServer.socketServer?.emit(event, data) : this.emit(event, data)
     }
 
+    async getAvailableCapital(currency: Currency): Promise<number> {
+        const capital = (await this.getCurrentAccountInfo(currency))?.balances.find(x => x.asset.toUpperCase() === currency.toUpperCase());
+        return capital ? capital.available : 0;
+    }
 
+    abstract getCurrentAccountInfo(currency: Currency): Promise<AccountInfo | undefined>
 
     /////////////////////    
     // WebSocket Server
@@ -163,7 +168,7 @@ export abstract class BrokerProviderBase extends EventEmitter {
     //////////////////////
     // WebSocket Listener
     
-    startSocketListener() {
+    startSocketListener(subscriptions: BrokerSubscriptionRequest[]) {
         const wsOptions = getProviderSocketOptionsByType(this.options, 'Broker', this.mode)
         const port = wsOptions ? wsOptions.port : 3000
         const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
@@ -173,6 +178,13 @@ export abstract class BrokerProviderBase extends EventEmitter {
         })
 
         this.socketClient.on('connect', () => {
+            subscriptions.forEach((s: BrokerSubscriptionRequest) => {
+                switch(s.type) {
+                    case 'ORDER':
+                        this.addProviderOrderSubscriptions(s.options)
+                        break
+                }
+            })
             this.subscriptionHistory.forEach(h => {
                 this.socketClient.send(h.topic, h.options)
             })

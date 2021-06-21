@@ -1,12 +1,12 @@
 #!/usr/bin/env ts-node
 
-import { OrderBook } from './src/common/definitions/broker';
+import { OrderBook } from './src/common/definitions/market-data';
 import yargs, { Argv } from 'yargs'
-import { ProviderOptions } from './src/common/definitions/collectors'
+import { ProviderOptions } from './src/common/definitions/connectors'
 import config from './config'
 const BinanceMarketData = require('./src/collectors/providers/binance/binance-market-data')
-import { Execution } from './src/strategies/base/models/strategy-options';
 import { wsServer, wsClient } from './src/cli/websocket'
+import { BotDetails } from './src/common/definitions/strategy';
 
 
 yargs
@@ -31,10 +31,9 @@ yargs
 
 function executeStrategy(yargs: Argv) {
     const BasicArbitrage = require('./src/strategies/examples/basic-arbitrage')
-    const execution: Execution = {
+    const execution: BotDetails = {
         id: '1',
         name: 'canary',
-        strategyId: 'basic-arb',
         mode: 'LIVE',
         baseCurrency: 'USD',
         symbols: [
@@ -42,6 +41,18 @@ function executeStrategy(yargs: Argv) {
             { symbol: 'ADAUSD', status: 'PENDING', reference: true, providerId: 'binance' }
         ],
         status: 'PENDING',
+        strategyOptions: {
+            id: '1',
+            name: 'canary',
+            class: 'basic-arb',
+            parameterDetails: new Map(),
+            orderSizeOptions: {
+                supportsFractionalShares: true,
+                tradeSizeAmount: 25,
+                maxCapitalPerSymbol: 100,
+                maxCapitalPerStrategy: 500
+            }
+        },        
         providers: [{ providerId: 'binance' }]
     }
 

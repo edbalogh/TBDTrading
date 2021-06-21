@@ -1,4 +1,5 @@
 import { Mode, Currency } from './basic'
+import { SubscriptionType } from './websocket'
 
 export type ProviderType = 'Broker' | 'MarketData' | 'Other'
 export type ConnectionStatus = 'PENDING' | 'DISCONNECTED' | 'CONNECTED' | 'RECONNECTING' | 'ERROR' | 'ACTIVE'
@@ -21,7 +22,8 @@ export interface ProviderService {
     mode?: Mode,
     startTime?: Date,
     statusLog?: StatusEntry[],
-    endTime?: Date
+    endTime?: Date,
+    subscriptions?: MarketDataSubscriptionRequest[] | BrokerSubscriptionRequest[]
 }
 
 /**
@@ -62,7 +64,7 @@ export interface WebSocketOptions {
     type: ProviderType,
     mode: Mode,
     port: number,
-    url?: string    
+    url?: string
 }
 
 export interface KinesisOptions {
@@ -86,3 +88,16 @@ export interface LiveOrderBookOptions {
 export interface LiveTradeOptions {
     symbols: string[]
 }
+
+export interface MarketDataSubscriptionRequest {
+    type: SubscriptionType,
+    options: LiveBarOptions | LiveTradeOptions | LiveOrderBookOptions
+}
+
+export interface OrderSubscriptionOptions { symbols: string[] }
+
+export interface BrokerSubscriptionRequest {
+    type: SubscriptionType,
+    options: OrderSubscriptionOptions
+}
+

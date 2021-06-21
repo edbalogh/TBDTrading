@@ -1,38 +1,59 @@
 import { BrokerProviderBase } from '../../base/broker-base'
-import { ExecutionType, OrderExecution, OrderStatus, OrderSide, OrderType, BrokerBalance, AccountInfo, Balance, OrderRequest, Order} from '../../../common/definitions/broker'
-import { OrderSubscriptionOptions } from '../../../common/definitions/websocket'
+import { ExecutionType, OrderExecution, OrderStatus, OrderSide, OrderType, BrokerBalance, AccountInfo, Balance, OrderRequest} from '../../../common/definitions/broker'
 import { Mode } from '../../../common/definitions/basic'
-import { ProviderOptions } from '../../../common/definitions/collectors'
+import { OrderSubscriptionOptions, ProviderOptions } from '../../../common/definitions/connectors'
 import { OutboundAccountInfo, ExecutionReport, BalanceUpdate, Balances, NewOrder, OrderSide as BrokerOrderSide, OrderType as BrokerOrderType, NewOcoOrder } from 'binance-api-node'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
 import { floor } from 'lodash'
-
 const Binance = require('binance-api-node').default
+
+const utils = require('../../../utils/legacy')
 
 export abstract class BinanceBroker extends BrokerProviderBase {
     providerSocket: any
     exchangeInfo?: any
-
+    
     constructor(options: ProviderOptions, mode: Mode) {
         const client = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
         super(options, mode, client)
     }
-
 
     async initialize() {
         super.initialize()
         this.exchangeInfo = await this.getExchangeInfo();
     }
 
-    async getExchangeInfo() {
+    async getExchangeInfo(): Promise<any> {
         try {
-            const response = await this.client.exchangeInfo();
-            if (response.error) throw new Error(response.error);
-            return response;
+            const response = await this.client.exchangeInfo()
+            if (response.error) throw new Error(response.error)
+            return response
         } catch(e) {
-            console.log('error trying to get exchange info', e);
+            console.log('error trying to get exchange info', e)
         } 
     }
+
+    async getLastBrokerTrade(symbol:string): Promise<Number | undefined> {
+        try {
+            const response = await this.client.prices(symbol)
+            if (response.error) throw new Error(response.error)
+            return Number(response[symbol])
+        } catch(e) {
+            utils.logDetails('error getting last trade from broker for symbol', e, null, symbol)
+        }       
+    }
+
+    async getCurrentAccountInfo(): Promise<AccountInfo | undefined> {
+        try {
+            const response = await this.client.accountInfo();
+            if (response.error) throw new Error(response.error);
+            return this.translateAccountInfo(response);
+        } catch(e) {
+            utils.logDetails('error trying to get account info', e);
+        }
+    }
+
+
 
     ////////////////////
     // WebSocket Server

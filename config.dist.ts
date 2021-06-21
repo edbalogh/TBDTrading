@@ -10,7 +10,8 @@ export default {
     },
 
     mongo: {
-        uri: "MONGO_CONNECTION_STRING_GOES_HERE"
+        uri: 'MONGO_CONNECTION_STRING_GOES_HERE',
+        defaultDatabase: 'tbd'
     },
 
     providers: [
@@ -27,7 +28,7 @@ export default {
                     location: '../../collectors/providers/binance/binance-broker'
                 }
             ],
-            supportedModes: ["LIVE", "BACKTEST"],
+            supportedModes: ['LIVE', 'BACKTEST'],
             apiOptions: {
                 apiKey: "API_KEY_GOES_HERE",
                 apiSecret: "API_SECRET_GOES_HERE",

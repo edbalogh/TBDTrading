@@ -1,3 +1,6 @@
+import { Currency } from "./basic"
+import { SubscriptionType } from "./websocket"
+
 export type OrderStatus = 'OPEN' | 'REJECTED' | 'CLOSED' | 'CANCELED' | 'ERROR' | 'LOST' | 'FILLED' | 'PARTIALLY_FILLED'
 export type OrderSide = 'BUY' | 'SELL'
 export type TimeInForce = 'GTC' | 'IOC' | 'FOK' | 'OPG'
@@ -54,7 +57,7 @@ export interface OrderRequest {
     id?: string,
     botId?: string,
     symbol: string,
-    currency?: string,
+    currency?: Currency,
     side: OrderSide,
     type: OrderType,
     tif?: TimeInForce,
