@@ -1,4 +1,4 @@
-import { Mode, Currency } from './basic'
+import { Mode } from './basic'
 import { SubscriptionType } from './websocket'
 
 export type ProviderType = 'Broker' | 'MarketData' | 'Other'
