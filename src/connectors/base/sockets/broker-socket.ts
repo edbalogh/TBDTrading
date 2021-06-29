@@ -1,6 +1,6 @@
 import { WebSocketServerBase } from './websocket-base'
-import { ProviderOptions } from '../../../common/definitions/connectors'
-import { BrokerRequestType, OrderSubscriptionOptions } from '../../../common/definitions/websocket'
+import { OrderSubscriptionOptions, ProviderOptions } from '../../../common/definitions/connectors'
+import { BrokerRequestType } from '../../../common/definitions/websocket'
 import { Mode } from '../../../common/definitions/basic'
 import { Socket } from 'socket.io'
 import { last } from 'lodash'
@@ -49,10 +49,10 @@ export class BrokerSocketServer extends WebSocketServerBase {
         if (!cb) throw new Error('no callback found for addOrderSubscriptions event')
         console.log(`registering new order subscriptions for connection ${connectionId}`)
         const newSymbols: string[] = []
-        options?.symbols.map(s => {
+        options?.symbols.map((s:any) => {
             const subOptions = { symbols: s }
-            if (!this.subscriptionExists('EXECUTION', subOptions)) newSymbols.push(s)
-            this.addSubscription(connectionId, 'EXECUTION', subOptions)
+            if (!this.subscriptionExists('ORDER', subOptions)) newSymbols.push(s)
+            this.addSubscription(connectionId, 'ORDER', subOptions)
         })
 
         const newOptions = { ...options }
@@ -65,7 +65,7 @@ export class BrokerSocketServer extends WebSocketServerBase {
 
     handleAccountSubscriptionRequest(connectionId: string, cb?: Function) {
         if (!cb) throw new Error('no callback found for addAccountSubscriptions event')
-        console.log(`registering new order book subscriptions for connection ${connectionId}`)
+        console.log(`registering new account subscription for connection ${connectionId}`)
         
         if (!this.subscriptionExists('ACCOUNT', {})) {
             this.addSubscription(connectionId, 'ACCOUNT', {})
@@ -77,7 +77,7 @@ export class BrokerSocketServer extends WebSocketServerBase {
 
     handleBalanceSubscriptionRequest(connectionId: string, cb?: Function) {
         if (!cb) throw new Error('no callback found for addBalanceSubscriptions event')
-        console.log(`registering new trade subscriptions for connection ${connectionId}`)
+        console.log(`registering new balance subscription for connection ${connectionId}`)
 
         if (!this.subscriptionExists('BALANCE', {})) {
             this.addSubscription(connectionId, 'BALANCE', {})
@@ -91,7 +91,7 @@ export class BrokerSocketServer extends WebSocketServerBase {
         const t = topic.split('.')
         switch(last(t)) {
             case 'orderExecution':
-                return this.activeSubscriptions.filter( (x:any) => x.type === 'EXECUTION' && x.options.symbol === t[0])
+                return this.activeSubscriptions.filter( (x:any) => x.type === 'ORDER' && x.options.symbol === t[0])
             case 'accountInfo':
                 return this.activeSubscriptions.filter( (x:any) => x.type === 'ACCOUNT')
             case 'brokerBalance':

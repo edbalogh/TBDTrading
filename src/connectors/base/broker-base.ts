@@ -4,7 +4,8 @@ import { BrokerRequestType } from '../../common/definitions/websocket'
 import { Mode, Currency } from '../../common/definitions/basic'
 import { EventEmitter } from 'events'
 import io from 'socket.io-client'
-import { OrderRequest, AccountInfo } from '../../common/definitions/broker'
+import { OrderRequest, AccountInfo, OrderExecution, Order, OrderFillStatus, Trade } from '../../common/definitions/broker'
+import { sum, divide } from 'lodash'
 
 export abstract class BrokerProviderBase extends EventEmitter {
     id: string
@@ -16,6 +17,8 @@ export abstract class BrokerProviderBase extends EventEmitter {
     socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
     providerServer?: BrokerSocketServer
     subscriptionHistory: any[] = []
+    activeOrders: Order[] = []
+    pendingOrderRequests: OrderRequest[] = []    
 
     constructor(options: ProviderOptions, mode: Mode, client: any) {
         super()
@@ -95,7 +98,7 @@ export abstract class BrokerProviderBase extends EventEmitter {
         }
     }
 
-    async initialize() {}
+    async initialize() { }
 
     /**
      * generic emitter that will either send to a websocket or local based on setup
@@ -167,9 +170,10 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     //////////////////////
     // WebSocket Listener
-    
+
     startSocketListener(subscriptions: BrokerSubscriptionRequest[]) {
         const wsOptions = getProviderSocketOptionsByType(this.options, 'Broker', this.mode)
+        console.log('Broker options', wsOptions)
         const port = wsOptions ? wsOptions.port : 3000
         const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
         this.socketClient = io(`${url}:${port}`)
@@ -178,13 +182,15 @@ export abstract class BrokerProviderBase extends EventEmitter {
         })
 
         this.socketClient.on('connect', () => {
-            subscriptions.forEach((s: BrokerSubscriptionRequest) => {
-                switch(s.type) {
-                    case 'ORDER':
-                        this.addProviderOrderSubscriptions(s.options)
-                        break
-                }
-            })
+            if (subscriptions.length > 0) {
+                subscriptions.forEach((s: BrokerSubscriptionRequest) => {
+                    switch (s.type) {
+                        case 'ORDER':
+                            this.addProviderOrderSubscriptions(s.options)
+                            break
+                    }
+                })
+            }
             this.subscriptionHistory.forEach(h => {
                 this.socketClient.send(h.topic, h.options)
             })
@@ -196,7 +202,6 @@ export abstract class BrokerProviderBase extends EventEmitter {
     }
 
 
-
     /////////////////////
     // Order Handling
 
@@ -204,7 +209,83 @@ export abstract class BrokerProviderBase extends EventEmitter {
     abstract placeBrokerOrder(brokerOrder: any): void
 
     async placeOrder(orderRequest: OrderRequest) {
+        this.pendingOrderRequests.push(orderRequest)
         const brokerOrder = this.buildBrokerOrderFromRequest(orderRequest)
         return this.placeBrokerOrder(brokerOrder)
     }
+
+    abstract getLastBrokerTrade(symbol: string): Promise<Number | undefined>
+
+    handleOrderExecutionEvent(orderExecution: OrderExecution): void {
+        this.emitter(`${orderExecution.symbol}.orderExecution`, orderExecution)
+    }
+
+    processOrderExecution(orderExecution: OrderExecution) {
+        switch(orderExecution.executionType) {
+            case 'NEW':
+                const pending = this.pendingOrderRequests.find(p => p.id === orderExecution.orderId)
+                if (!pending) return            
+                return this.createOrderFromNewExecution(orderExecution, pending)
+            // case 'CANCELED':
+            // case 'EXPIRED':
+            default:
+                const active = this.activeOrders.find(a => a.id === orderExecution.orderId)
+                if (!active) return
+                return this.updateOrderFromExecution(orderExecution, active)
+        }
+    }
+
+    createOrderFromNewExecution(orderExecution: OrderExecution, pendingOrder: OrderRequest): Order {
+        return {
+            id: orderExecution.orderId,
+            botId: pendingOrder.botId || '',
+            symbol: orderExecution.symbol,
+            currency: pendingOrder.currency || 'USD',
+            side: orderExecution.orderSide,
+            type: orderExecution.orderType,
+            tif: orderExecution.tif,
+            status: orderExecution.orderStatus,
+            fillStatus: 'NONE',
+            price: orderExecution.priceRequested,
+            amount: orderExecution.amountRequested,
+            shares: pendingOrder.requestedShares,
+            lastFillPrice: orderExecution.lastTradePrice,
+            avgFillPrice: 0,
+            lastFillAmount: orderExecution.lastTradeAmount,
+            totalFillAmount: orderExecution.totalAmount,
+            trades: []
+        }
+    }
+
+    updateOrderFromExecution(orderExecution: OrderExecution, activeOrder: Order): Order {
+        const fillStatus = ['FILLED', 'PARTIALLY_FILLED'].includes(orderExecution.orderStatus) ? orderExecution.orderStatus : activeOrder.fillStatus
+        
+        if(orderExecution.tradeId) {
+            activeOrder.trades.push({
+                tradeId: orderExecution.tradeId, price: Number(orderExecution.lastTradePrice), shares: Number(orderExecution.lastTradeShares),
+                amount: Number(orderExecution.lastTradeAmount), commission: Number(orderExecution.commission)
+            })
+        }
+
+        return {
+            id: activeOrder.id,
+            botId: activeOrder.botId,
+            symbol: activeOrder.symbol,
+            currency: activeOrder.currency,
+            side: activeOrder.side,
+            type: activeOrder.type,
+            tif: activeOrder.tif,
+            status: orderExecution.orderStatus,
+            fillStatus: fillStatus as OrderFillStatus,
+            lastFillPrice: orderExecution.lastTradePrice,
+            avgFillPrice: divide(sum(activeOrder.trades.map(t => t.amount)), sum(activeOrder.trades.map(t => t.shares))),
+            lastFillAmount: orderExecution.lastTradeAmount,
+            totalFillAmount: orderExecution.totalAmount,
+            rejectReason: orderExecution.rejectReason,
+            trades: activeOrder.trades
+        }
+    }
+
+    handleAccountEvent(accountInfo: AccountInfo) {}
+    
 }

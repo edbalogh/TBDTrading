@@ -17,7 +17,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
         console.log('registering events')
 
         this.socketServer?.on('connect', (socket: Socket) => {
-            console.log(`socketServerConnect,socket=${socket}`)
+            console.log(`socketServerConnect,socket=${socket.id}`)
             // return the instanceId to the listener
             socket.emit('initialize', { instanceId: this.instanceId })
             socket.on('disconnect', (reason: string) => {

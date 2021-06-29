@@ -3,7 +3,7 @@ import express, {Express, NextFunction, Request, Response} from 'express'
 import http from 'http'
 import {Server, Socket} from 'socket.io'
 import { ProviderOptions, ProviderType, getProviderSocketOptionsByType } from '../../../common/definitions/connectors'
-import { v4 as uuid } from 'uuid'
+import shortid from 'shortid'
 import { isEqual, last } from 'lodash'
 import { Mode } from '../../../common/definitions/basic'
 import { SubscriptionType } from '../../../common/definitions/websocket'
@@ -24,7 +24,7 @@ export class WebSocketServerBase {
     activeSubscriptions:any[] = []
 
     constructor(options: ProviderOptions, type: ProviderType, mode: Mode) {
-        this.instanceId = uuid()
+        this.instanceId = shortid()
         this.providerId = options.id
         const wsOptions = getProviderSocketOptionsByType(options, type, mode)
         this.port = wsOptions ? wsOptions.port : 3000
@@ -68,6 +68,7 @@ export class WebSocketServerBase {
 
     emit(topic: string, ...args: any[]) {
         const connections = this.findConnectionsForTopic(topic, args) || []
+        console.log(`sending message,topic=${topic},args=${args},connections=${connections}`)
         this.socketServer?.to(connections).emit(topic, args)
     }
 

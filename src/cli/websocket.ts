@@ -1,8 +1,8 @@
 import { Argv } from 'yargs'
 import { ProviderOptions } from '../common/definitions/connectors'
 import config from '../../config'
-const BinanceMarketData = require('../collectors/providers/binance/binance-market-data')
-const BinanceBroker = require('../collectors/providers/binance/binance-broker')
+const BinanceMarketData = require('../connectors/providers/binance/binance-market-data')
+const BinanceBroker = require('../connectors/providers/binance/binance-broker')
 
 export function wsServer(yargs: Argv) {
     const options = yargs
@@ -64,8 +64,11 @@ export function wsClient(yargs: Argv) {
         process.exit();
     });
 
-    binanceData.startSocketListener()
-    binanceBroker.startSocketListener()
+    binanceData.startSocketListener([
+        { type: 'BAR', options: { symbols, timeframe: '15m', showActive: true }},
+        { type: 'BOOK', options: { symbols }}
+    ])
+    binanceBroker.startSocketListener([{ type: 'ORDER', options: {}}])
 
     if (topics.includes('book')) {
         symbols.forEach(s => {

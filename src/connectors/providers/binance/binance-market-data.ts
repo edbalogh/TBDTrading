@@ -127,7 +127,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
 
     _sendBarBatchEvents(bars: any, interval: string, symbol: string): void {
         bars.filter((b: any) => b && b.openTime && b.openTime > 0).forEach((b: any) => {
-            this.emitter(`${symbol}.bar`, this.translateHistoricalBar(b, interval, symbol)) // TODO: consider moving the emit to the base class to make provider more generic
+            super.handleBarEvent(this.translateHistoricalBar(b, interval, symbol), {})
         })
     }
 
@@ -159,8 +159,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
         this.providerSocket = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
             switch (event.eventType) {
                 case 'kline':
-                    const bar: Bar = this.translateLiveBar(event)
-                    if (options.showActive || !bar.inProgress) this.emitter(`${bar.symbol}.bar`, bar)
+                    super.handleBarEvent(this.translateLiveBar(event), options)                    
                     break
                 default:
                     console.log(`untracked websocket event`)
@@ -192,11 +191,8 @@ export class BinanceMarketData extends MarketDataProviderBase {
         this.providerSocket = this.client.ws.depth(options.symbols, (event: Depth) => {
             switch (event.eventType) {
                 case 'depthUpdate':
-                    const book = this.translateLiveOrderBook(event)
-                    if (book.bids.length > 0 && book.asks.length > 0) {
-                        this.emitter(`${book.symbol}.book`, book)
-                    }
-                    break;
+                    super.handleOrderBookEvent(this.translateLiveOrderBook(event))                    
+                    break
                 default:
                     console.log(`untracked websocket event`)
                     console.log(event)

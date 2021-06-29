@@ -21,11 +21,11 @@ export default {
             scriptLocations: [
                 {
                     type: 'MarketData',
-                    location: '../../collectors/providers/binance/binance-market-data'
+                    location: '../../connectors/providers/binance/binance-market-data'
                 },
                 {
                     type: 'Broker',
-                    location: '../../collectors/providers/binance/binance-broker'
+                    location: '../../connectors/providers/binance/binance-broker'
                 }
             ],
             supportedModes: ['LIVE', 'BACKTEST'],
@@ -57,11 +57,11 @@ export default {
             scriptLocations: [
                 {
                     type: 'MarketData',
-                    location: '../../collectors/providers/alpaca/alpaca-market-data'
+                    location: '../../connectors/providers/alpaca/alpaca-market-data'
                 },
                 {
                     type: 'Broker',
-                    location: '../../collectors/providers/alpaca/alpaca-broker'
+                    location: '../../connectors/providers/alpaca/alpaca-broker'
                 }
             ],
             supportedModes: ["LIVE"],
@@ -92,11 +92,11 @@ export default {
             scriptLocations: [
                 {
                     type: 'MarketData',
-                    location: '../../collectors/providers/alpaca/alpaca-market-data'
+                    location: '../../connectors/providers/alpaca/alpaca-market-data'
                 },
                 {
                     type: 'Broker',
-                    location: '../../collectors/providers/alpaca/alpaca-broker'
+                    location: '../../connectors/providers/alpaca/alpaca-broker'
                 }
             ],
             supportedModes: ["PAPER", "BACKTEST"],

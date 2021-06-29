@@ -40,3 +40,11 @@ export interface BookLevel {
   price: number,
   quantity: number
 }
+
+// TODO: finish this out
+export interface Trade {
+  symbol: string,
+  price: number,
+  volume: number,
+  isTaker: boolean
+}

@@ -5,6 +5,7 @@ import { OrderSubscriptionOptions, ProviderOptions } from '../../../common/defin
 import { OutboundAccountInfo, ExecutionReport, BalanceUpdate, Balances, NewOrder, OrderSide as BrokerOrderSide, OrderType as BrokerOrderType, NewOcoOrder } from 'binance-api-node'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
 import { floor } from 'lodash'
+import { number } from 'yargs'
 const Binance = require('binance-api-node').default
 
 const utils = require('../../../utils/legacy')
@@ -33,9 +34,9 @@ export abstract class BinanceBroker extends BrokerProviderBase {
         } 
     }
 
-    async getLastBrokerTrade(symbol:string): Promise<Number | undefined> {
+    async getLastBrokerTrade(symbol: string): Promise<Number | undefined> {
         try {
-            const response = await this.client.prices(symbol)
+            const response = await this.client.prices({symbol})
             if (response.error) throw new Error(response.error)
             return Number(response[symbol])
         } catch(e) {
@@ -69,24 +70,15 @@ export abstract class BinanceBroker extends BrokerProviderBase {
     }
 
     addProviderUserSubscriptions(): void {
-        if (this.providerSocket) return
+        console.log('addProviderOrderSubscriptions')
         this.providerSocket = this.client.ws.user((event: any) => {
             switch (event.eventType) {
                 case 'executionReport':
-                    const execution: OrderExecution = this.translateOrderExecution(event)
-                    this.emitter(`${execution.symbol}.orderExecution`, execution)
+                    // console.log('binance execution event', event)
+                    super.handleOrderExecutionEvent(this.translateOrderExecution(event))                    
                     break
                 case 'account':
-                    const accountInfo: AccountInfo = this.translateAccountInfo(event)
-                    this.emitter('accountInfo', accountInfo)
-                    break
-                case 'balanceUpdate':
-                    const balanceUpdate: BrokerBalance = this.translateBrokerBalance(event)
-                    this.emitter('brokerBalance', event)
-                    break
-                case 'outboundAccountPosition':
-                    // const brokerPosition: BrokerPosition = this.translateBrokerPosition(event)
-                    this.emitter('brokerPosition', event)
+                    super.handleAccountEvent(this.translateAccountInfo(event))
                     break
                 default:
                     console.log(`untracked websocket event`, event)
@@ -98,7 +90,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
     translateOrderExecution(execution: ExecutionReport): OrderExecution {
         return {
             symbol: execution.symbol,
-            orderId: execution.originalClientOrderId || '',
+            orderId: execution.originalClientOrderId || execution.newClientOrderId,
             brokerOrderId: <string>(execution.orderId || execution.orderListId || ''),
             executionType: <ExecutionType>execution.executionType,
             executionTime: barEpochTimeToUTC(execution.orderTime),
@@ -108,9 +100,14 @@ export abstract class BinanceBroker extends BrokerProviderBase {
             orderTime: barEpochTimeToUTC(execution.creationTime),
             tif: execution.timeInForce,
             rejectReason: execution.orderRejectReason,
-            executionQuantity: Number(execution.quantity),
-            totalQuantity: Number(execution.totalQuoteTradeQuantity),
-            executionPrice: Number(execution.price),
+            sharesRequested: Number(execution.quantity),
+            lastTradeShares: Number(execution.lastQuoteTransacted),
+            totalShares: Number(execution.totalQuoteTradeQuantity),
+            priceRequested: Number(execution.price),
+            lastTradePrice: Number(execution.priceLastTrade),
+            amountRequested: Number(execution.quoteOrderQuantity),
+            lastTradeAmount: Number(execution.lastQuoteTransacted),
+            totalAmount: Number(execution.totalQuoteTradeQuantity),
             commission: Number(execution.commission),
             commissionAsset: execution.commissionAsset || '',
             tradeId: <string>(execution.tradeId || '')
@@ -194,7 +191,6 @@ export abstract class BinanceBroker extends BrokerProviderBase {
                 brokerOrder.price = orderRequest.isExit ? brokerOrder.price = orderRequest.limitPrice : this.applyPrecisionToTradePrice(orderRequest.symbol, orderRequest.limitPrice);
             }
         }
-
         
         return brokerOrder
     }
@@ -212,6 +208,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
 
     async placeBrokerOrder(brokerOrder: any) {
         try {
+            console.log('submitting order', brokerOrder)
             const response = brokerOrder.listClientOrderId ? await this.client.orderOco(brokerOrder) : await this.client.order(brokerOrder);
             if (response.error) {
                 throw new Error(response.error);

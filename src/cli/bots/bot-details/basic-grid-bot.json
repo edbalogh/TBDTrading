@@ -11,8 +11,8 @@
                 {
                     "type": "BAR",
                     "options": {
-                        "timeframe": "1h",
-                        "showActive": true
+                        "timeframe": "1m",
+                        "showActive": false
                     }
                 },
                 {
@@ -26,7 +26,8 @@
             "providerType": "Broker",
             "subscriptions": [
                 {
-                    "type": "ORDER"
+                    "type": "ORDER",
+                    "options": {}
                 }
             ]
         }

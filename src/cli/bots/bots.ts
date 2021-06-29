@@ -15,9 +15,8 @@ export function startExampleBot(yargs: Argv) {
 
     process.on('SIGINT', function () {
         console.log("Caught interrupt signal, closing bot");
-        bot.stopMarketDataStream()
         process.exit();
     });  
 
-    bot.startUp()
+    bot.startup()
 }

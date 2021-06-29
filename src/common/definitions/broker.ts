@@ -1,5 +1,4 @@
 import { Currency } from "./basic"
-import { SubscriptionType } from "./websocket"
 
 export type OrderStatus = 'OPEN' | 'REJECTED' | 'CLOSED' | 'CANCELED' | 'ERROR' | 'LOST' | 'FILLED' | 'PARTIALLY_FILLED'
 export type OrderSide = 'BUY' | 'SELL'
@@ -27,9 +26,15 @@ export interface OrderExecution {
     orderStatus: OrderStatus,
     orderSide: OrderSide,
     tif: TimeInForce,
-    executionQuantity: number,
-    totalQuantity: number,
-    executionPrice: number,
+    sharesRequested: number,
+    lastTradeShares?: number,
+    totalShares: number,
+    priceRequested?: number,
+    lastTradePrice?: number,
+    avgPrice?: number,
+    amountRequested?: number,
+    lastTradeAmount?: number,
+    totalAmount?: number,
     rejectReason?: string,
     commission?: number,
     commissionAsset?: string,
@@ -54,13 +59,13 @@ export interface BrokerBalance {
 }
 
 export interface OrderRequest {
-    id?: string,
-    botId?: string,
+    id: string,
+    botId: string,
     symbol: string,
-    currency?: Currency,
+    currency: Currency,
     side: OrderSide,
     type: OrderType,
-    tif?: TimeInForce,
+    tif: TimeInForce,
     limitPrice?: number,
     stopPrice?: number,
     stopLimitPrice?: number,
@@ -71,7 +76,7 @@ export interface OrderRequest {
 
 export interface Order {
     id: string,
-    botId: number,
+    botId: string,
     symbol: string,
     currency: string,
     side: OrderSide,
@@ -81,10 +86,23 @@ export interface Order {
     fillStatus: OrderFillStatus,
     price?: Number,
     amount?: Number,
-    sharesRequested?: Number,
-    sharesFilled?: Number,
+    shares?: Number,
     lastFillPrice?: Number,
-    avgFillPrice?: Number
+    avgFillPrice?: Number,
+    lastFillAmount?: Number,
+    totalFillAmount?: Number,
+    lastFillShares?: Number,
+    totalFillShares?: Number,
+    rejectReason?: string,
+    trades: Trade[]
+}
+
+export interface Trade {
+    tradeId: string,
+    price: number,
+    shares: number,
+    amount: number,
+    commission: number
 }
 
 export interface Position {

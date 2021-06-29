@@ -1,7 +1,7 @@
 import { ProviderOptions, Connection, ProviderType, ProviderService, MarketDataSubscriptionRequest, BrokerSubscriptionRequest } from '../../common/definitions/connectors'
 import { BotDetails, OrderSizeOptions, SymbolDetails } from '../../common/definitions/strategy'
 import { Bar, OrderBook } from '../../common/definitions/market-data'
-import { Order, Position, OrderRequest } from '../../common/definitions/broker'
+import { Order, Position, OrderRequest, OrderExecution } from '../../common/definitions/broker'
 import { Currency, Mode } from '../../common/definitions/basic'
 import config from '../../../config'
 import { findOne, insertOne, upsert } from '../../mongo/mongo-utils'
@@ -18,8 +18,6 @@ export abstract class StrategyBase {
     name: string
     mode: Mode
     position?: Position
-    activeOrders: Order[] = []
-    pendingOrderRequests: OrderRequest[] = []
     brokerProvider: any
     supportsFractionalShares: boolean = false
     orderSizeCalculator: OrderSizeCalculator
@@ -38,13 +36,13 @@ export abstract class StrategyBase {
 
     buildBrokerClass() {
         const broker = this.botDetails.providers.find(p => p.providerType === 'Broker')
-        if (!broker) throw new Error (`failed to load Broker for bot ${this.name}, missing Broker in providers section`)
+        if (!broker) throw new Error(`failed to load Broker for bot ${this.name}, missing Broker in providers section`)
         const provider = config.providers.find(p => p.id === broker.providerId)
-        if (!provider) throw new Error (`failed to load Broker for bot ${this.name}, missing providerId in config`)
+        if (!provider) throw new Error(`failed to load Broker for bot ${this.name}, missing providerId in config`)
         const script = provider.scriptLocations.find(l => l.type === 'Broker')
         if (!script) throw new Error(`failed to load Broker for ${this.name}, missing Broker in scriptLocations`)
         const BrokerProvider = require(`${script.location}`)
-        this.brokerProvider = new BrokerProvider(provider, this.mode)
+        return new BrokerProvider(provider, this.mode)
     }
 
     startup(): void {
@@ -58,44 +56,47 @@ export abstract class StrategyBase {
                 throw new Error(`Provider '${p.providerId}' not found in configuration`)
             }
 
-            const providerScript = providerOptions.scriptLocations?.find(x => x.type === 'MarketData')
-
-            if (providerScript) { // && fs.existsSync(providerScript.location)) {  // TODO: fix this
-
-                switch (providerScript.type) {
-                    case 'MarketData':
-                        this.addMarketDataListener(providerOptions, providerScript.location, p.subscriptions)
-                        break
-                    case 'Broker':
-                        this.addBrokerListener(providerOptions, providerScript.location, p.subscriptions)
-                        break
-                    default:
-                        this.addOtherListener(providerOptions, providerScript.location, p.subscriptions)
-                }
-            } else {
-                throw new Error(`found provider ${p.providerId}, but scriptLocation for MarketData either does not exist or contains an invalid path`)
+            switch (p.providerType) {
+                case 'MarketData':
+                    this.addMarketDataListener(providerOptions, p.subscriptions)
+                    break
+                case 'Broker':
+                    this.addBrokerListener(providerOptions, p.subscriptions)
+                    break
+                default:
+                    this.addOtherListener(providerOptions, p.subscriptions)
             }
 
         })
     }
 
     async shutdown(): Promise<any> {
-        return Promise.all(this.connections.map( (c:any) => {
+        return Promise.all(this.connections.map((c: any) => {
             return c.class.stopSocketListener()
         }))
     }
 
-    addMarketDataListener(providerOptions: ProviderOptions, location: string, subscriptions: MarketDataSubscriptionRequest[] | undefined): void {
-        const MarketDataClass = require(location)
+    addMarketDataListener(providerOptions: ProviderOptions, subscriptions: MarketDataSubscriptionRequest[] | undefined): void {
+        const providerScript = providerOptions.scriptLocations?.find(x => x.type === 'MarketData')
+        if (!providerScript) throw new Error('no MarketData provider script found in config')
+        const MarketDataClass = require(providerScript.location)
         const md = new MarketDataClass(providerOptions, this.mode)
         md.on(`${this.symbol?.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
         md.on(`${this.symbol?.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
+        const symbols = [this.symbol.symbol]
 
         this.botDetails.symbols.forEach(s => {
             if (s.reference) {
+                symbols.push(s.symbol)
                 md.on(`${s.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
                 md.on(`${s.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
             }
+        })
+
+        // add symbols to subscription options
+        subscriptions?.forEach((s: any) => {
+            if (!s.options) s.options = {}
+            s.options.symbols = symbols
         })
 
         // start listener
@@ -119,8 +120,8 @@ export abstract class StrategyBase {
             connection.status = 'CONNECTED'
             connection.providerInstanceId = providerInstanceId
             connection.instanceId = socketId,
-            connection.startTime = new Date(),
-            connection.statusLog?.push({ time: new Date(), status: 'CONNECTED' })
+                connection.startTime = new Date(),
+                connection.statusLog?.push({ time: new Date(), status: 'CONNECTED' })
         })
         listener.on('disconnect', () => {
             connection.status = 'DISCONNECTED'
@@ -134,32 +135,32 @@ export abstract class StrategyBase {
         return connection
     }
 
-    addBrokerListener(providerOptions: ProviderOptions, location: string, subscriptions: BrokerSubscriptionRequest[] | undefined): void {
-        const BrokerClass = require(location)
-        const broker = new BrokerClass(providerOptions, this.mode)
-        broker.on(`${this.symbol?.symbol}.orderUpdate`, (order: Order) => this._onOrderUpdate(order))
-        broker.on(`${this.symbol?.symbol}.orderComplete`, (order: Order) => this._onOrderComplete(order))
+    addBrokerListener(providerOptions: ProviderOptions, subscriptions: BrokerSubscriptionRequest[] | undefined): void {
+        // const BrokerClass = require(location)
+        // const broker = new BrokerClass(providerOptions, this.mode)
+        this.brokerProvider.on(`${this.symbol?.symbol}.orderExecution`, (orderExecution: OrderExecution) => this._onOrderExecution(orderExecution))
 
         // start listener
-        broker.startSocketListener(subscriptions)
-        this.connections.push({ class: broker, options: providerOptions })
+        this.brokerProvider.startSocketListener(subscriptions)
+        this.connections.push({ class: providerOptions.id, options: providerOptions })
         return
     }
 
-    addOtherListener(providerOptions: ProviderOptions, location: string, subscriptions: any): void { }
+    // TODO: implement other
+    addOtherListener(providerOptions: ProviderOptions, subscriptions: any): void { }
 
-    async placeOrder(orderRequest: OrderRequest) {
+    async placeOrder(orderRequest: Partial<OrderRequest>) {
         orderRequest.botId = this.botId
         orderRequest.id = `${this.botId}-${shortid()}`
         orderRequest.currency = orderRequest.currency || this.botDetails.baseCurrency
         orderRequest.tif = orderRequest.tif || 'GTC'
+        const finalOrderRequest = orderRequest as OrderRequest
 
-        const lastPrice = await this.getLastBrokerTrade(orderRequest.symbol)
-        const availableCapital = await this.getAvailableCapital(orderRequest.currency || this.botDetails.baseCurrency);
-        this.orderSizeCalculator.calculateOrderSize(orderRequest, lastPrice, availableCapital)
-        this.pendingOrderRequests.push(orderRequest)
-
-        this.brokerProvider.placeOrder(orderRequest)
+        const lastPrice = await this.brokerProvider.getLastBrokerTrade(orderRequest.symbol)
+        const availableCapital = await this.brokerProvider.getAvailableCapital(orderRequest.currency || this.botDetails.baseCurrency);
+        this.orderSizeCalculator.calculateOrderSize(finalOrderRequest, lastPrice, availableCapital)
+       
+        this.brokerProvider.placeOrder(finalOrderRequest)
     }
 
     /**
@@ -168,7 +169,7 @@ export abstract class StrategyBase {
      */
     async _onBarUpdate(bar: Bar): Promise<void> {
         bar = this.addBarIndicators(bar)
-        this.onNextBar(bar)
+        return this.onNextBar(bar)
     }
 
     addBarIndicators(bar: Bar): Bar {
@@ -177,14 +178,18 @@ export abstract class StrategyBase {
     }
 
     async _onOrderUpdate(order: Order): Promise<void> {
-        this.activeOrders = this.activeOrders.filter(o =>  o.id !== order.id)
+        this.brokerProvider.activeOrders = this.brokerProvider.activeOrders.filter((o: Order) => o.id !== order.id)
         if (['LOST', 'REJECTED'].includes(order.status)) {
-            this.pendingOrderRequests = this.pendingOrderRequests.filter(r => r.id !== order.id)
-        } else if(['OPEN', 'PARTIALLY_FILLED', 'FILLED'].includes(order.status)) {
-            this.activeOrders.push(order)
+            this.brokerProvider.pendingOrderRequests = this.brokerProvider.pendingOrderRequests.filter((r: OrderRequest) => r.id !== order.id)
+        } else if (['OPEN', 'PARTIALLY_FILLED', 'FILLED'].includes(order.status)) {
+            this.brokerProvider.activeOrders.push(order)
         }
-   
+
         return this.onOrderUpdate(order)
+    }
+
+    async _onOrderExecution(orderExecution: OrderExecution) {
+        return this._onOrderUpdate(this.brokerProvider.processOrderExecution(orderExecution))
     }
 
     async _onOrderBookUpdate(book: OrderBook): Promise<void> {
@@ -195,16 +200,9 @@ export abstract class StrategyBase {
         return this.onOrderUpdate(order)
     }
 
-    async onOrderComplete(order: Order): Promise<void> {}
-    async onNextBar(bar: Bar): Promise<void> {}
-    async onOrderBookUpdate(book: OrderBook): Promise<void> {}
-    async onOrderUpdate(order: Order): Promise<void> {}
-
-    async getLastBrokerTrade(symbol: string): Promise<number> {
-        throw new Error(`getLastBrokerTrade() function not implemented!`);
-    }
-
-    async getAvailableCapital(currency: Currency): Promise<number> {
-        throw new Error(`required method getAvailableCapital() not implemented for broker`);
-    }
+    async onOrderComplete(order: Order): Promise<void> { }
+    async onNextBar(bar: Bar): Promise<void> { }
+    async onOrderBookUpdate(book: OrderBook): Promise<void> { }
+    async onOrderUpdate(order: Order): Promise<void> { }
+    async onOrderExecution(orderExecution: OrderExecution): Promise<void> { }
 }

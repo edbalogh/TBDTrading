@@ -1,26 +1,43 @@
 import { BotDetails, SymbolDetails } from '../../common/definitions/strategy'
-import { Order  } from '../../common/definitions/broker'
+import { Order, OrderExecution  } from '../../common/definitions/broker'
 import { Bar, OrderBook } from '../../common/definitions/market-data'
 import { StrategyBase } from '../base/stategy-base'
 
-export class BasicGrid extends StrategyBase {
-    desiredLevels: number = 2
-    minGapPct: number = 0.5
-
+export class TrendFollower extends StrategyBase {
+    lastBar?: Bar
+    currentBar?: Bar
+    
     constructor(options: BotDetails, symbolDetails: SymbolDetails) {
         super(options, symbolDetails)
     }
 
     async onOrderUpdate(order: Order) {
-        console.log('strategy order update', order)
+        console.log(order)
        // TODO: when order has been filled, place order on opposite side at next level
+    }
+
+    async onOrderExecution(orderExecution: OrderExecution) {
+        console.log(orderExecution)
+        return
     }
 
     async onNextBar(bar: Bar) {
         // TODO: check existing orders vs expected grid orders
         console.log(bar)
+        if(!this.currentBar) {
+            this.currentBar = bar
+            return
+        }
+        this.lastBar = this.currentBar
+        this.currentBar = bar
+
         if(this.position && this.position?.currentShares > 0) return
         if(this.brokerProvider.activeOrders.length + this.brokerProvider.pendingOrderRequests.length > 0) return
+
+        this.attemptNewPosition()
+
+
+
         return this.placeOrder({
             symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100
         })
@@ -30,6 +47,11 @@ export class BasicGrid extends StrategyBase {
         // console.log('new order book', book)
         return
     }
+
+    attemptNewPosition() {
+        // lastBar is red, this currentBar is green
+        // lastBar.volume is < currentBar.volume
+    }
 }
 
-module.exports = BasicGrid
+module.exports = TrendFollower

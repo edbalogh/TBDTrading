@@ -1,10 +1,11 @@
 #!/usr/bin/env ts-node
 
+import { startExampleBot } from './src/cli/bots/bots' 
 import { OrderBook } from './src/common/definitions/market-data';
 import yargs, { Argv } from 'yargs'
 import { ProviderOptions } from './src/common/definitions/connectors'
 import config from './config'
-const BinanceMarketData = require('./src/collectors/providers/binance/binance-market-data')
+const BinanceMarketData = require('./src/connectors/providers/binance/binance-market-data')
 import { wsServer, wsClient } from './src/cli/websocket'
 import { BotDetails } from './src/common/definitions/strategy';
 
@@ -24,6 +25,9 @@ yargs
     .command('wsListener', 'Start WebSocket Listener', (yargs: Argv) => {
         return wsClient(yargs)
     })
+    .command('startExampleBot', 'Start Bot', (yargs: Argv) => {
+        return startExampleBot(yargs)
+    })  
     .command('execution', 'Start Execution', (yargs: Argv) => {
         return executeStrategy(yargs)
     })
