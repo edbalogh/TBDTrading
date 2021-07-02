@@ -1,5 +1,5 @@
 import { BotDetails, SymbolDetails } from '../../common/definitions/strategy'
-import { Order, OrderExecution  } from '../../common/definitions/broker'
+import { Order, OrderExecution  } from '../../connectors/positions/order-manager'
 import { Bar, OrderBook } from '../../common/definitions/market-data'
 import { StrategyBase } from '../base/stategy-base'
 
@@ -31,12 +31,12 @@ export class TrendFollower extends StrategyBase {
         this.lastBar = this.currentBar
         this.currentBar = bar
 
-        if(this.position && this.position?.currentShares > 0) return
+        if(this.position && this.position?.currentShares > 0) {
+            return this.evaluateExistingPosition()
+        }
         if(this.brokerProvider.activeOrders.length + this.brokerProvider.pendingOrderRequests.length > 0) return
 
         this.attemptNewPosition()
-
-
 
         return this.placeOrder({
             symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100
@@ -51,6 +51,11 @@ export class TrendFollower extends StrategyBase {
     attemptNewPosition() {
         // lastBar is red, this currentBar is green
         // lastBar.volume is < currentBar.volume
+    }
+
+    evaluateExistingPosition() {
+        // higher high and higher low (or vice versa)?  yes? highly aggressive
+        // else set stop limit at last low for 1/2 original position
     }
 }
 

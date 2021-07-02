@@ -1,33 +1,38 @@
-import { ProviderOptions, getProviderSocketOptionsByType, OrderSubscriptionOptions, BrokerSubscriptionRequest } from '../../common/definitions/connectors'
-import { BrokerSocketServer } from './sockets/broker-socket'
-import { BrokerRequestType } from '../../common/definitions/websocket'
+import { ProviderOptions, getProviderSocketOptionsByType, BrokerSubscriptionRequest, OrderSubscriptionOptions } from '../../common/definitions/connectors'
 import { Mode, Currency } from '../../common/definitions/basic'
 import { EventEmitter } from 'events'
 import io from 'socket.io-client'
-import { OrderRequest, AccountInfo, OrderExecution, Order, OrderFillStatus, Trade } from '../../common/definitions/broker'
-import { sum, divide } from 'lodash'
+import { OrderRequest, AccountInfo, OrderExecution, Order, OrderManager } from '../positions/order-manager'
+import { PositionManager } from '../positions/position-manager'
+
+export type BrokerStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED'
+export interface BrokerOptions {
+    id: string,
+    name: string,
+    class: string,
+    parameterDetails: Map<string, any>    
+}
+
 
 export abstract class BrokerProviderBase extends EventEmitter {
     id: string
     options: ProviderOptions
     mode: Mode
-    client: any
+    providerClient: any
     isActive: boolean = false
-    activeSymbols: string[] = []
     socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
-    providerServer?: BrokerSocketServer
     subscriptionHistory: any[] = []
-    activeOrders: Order[] = []
-    pendingOrderRequests: OrderRequest[] = []    
-
-    constructor(options: ProviderOptions, mode: Mode, client: any) {
+    activeSymbols: string[] = []
+    positionManager: PositionManager = new PositionManager()
+    orderManager: OrderManager = new OrderManager()
+        
+    constructor(options: ProviderOptions, mode: Mode) {
         super()
         if (!options.supportedModes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
         if (!options.scriptLocations.find(s => s.type === 'Broker')) throw new Error(`Provider ${options.id} does not support providerType 'Broker'`)
         this.id = options.id
         this.options = options
         this.mode = mode
-        this.client = client
     }
 
     static parameterDetails() {
@@ -100,15 +105,6 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     async initialize() { }
 
-    /**
-     * generic emitter that will either send to a websocket or local based on setup
-     * @param event event that is being sent out
-     * @param data data that goes with the event
-     */
-    emitter(event: string, data: any) {
-        this.providerServer ? this.providerServer.socketServer?.emit(event, data) : this.emit(event, data)
-    }
-
     async getAvailableCapital(currency: Currency): Promise<number> {
         const capital = (await this.getCurrentAccountInfo(currency))?.balances.find(x => x.asset.toUpperCase() === currency.toUpperCase());
         return capital ? capital.available : 0;
@@ -116,60 +112,14 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     abstract getCurrentAccountInfo(currency: Currency): Promise<AccountInfo | undefined>
 
-    /////////////////////    
-    // WebSocket Server
-
-    startSocketServer() {
-        this.providerServer = new BrokerSocketServer(this.options, this.mode)
-        this.providerServer.startServer()
-
-        // register the Provider specific method to be called when a new subsription is requested
-        const eventCallbacks: Map<BrokerRequestType, Function> = new Map()
-        eventCallbacks.set('addOrderSubscriptions', this.addServerOrderSubscriptions.bind(this))
-        eventCallbacks.set('addAccountSubscription', this.addServerAccountSubscription.bind(this))
-        eventCallbacks.set('addBalanceSubscription', this.addServerBalanceSubscription.bind(this))
-
-        // add Account and Balance listeners
-        this.providerServer.registerEvents(eventCallbacks)
-        this.providerServer.handleAccountSubscriptionRequest('server', this.addServerAccountSubscription.bind(this))
-    }
-
-    stopSocketServer() {
-        this.providerServer?.close()
-    }
-
-    getLiveAccountData() {
-        this.subscriptionHistory.push({ topic: 'addAccountSubscription' })
-        this.socketClient.send('addAccountSubscription')
-    }
-
-    getLiveOrderExecutionData() {
-        this.subscriptionHistory.push({ topic: 'addOrderSubscriptions' })
-        this.socketClient.send('addOrderSubscriptions')
-    }
-
-    // method to add the bar subscription to the local server
-    addServerOrderSubscriptions(options: OrderSubscriptionOptions) {
-        this.addProviderOrderSubscriptions(options)
-    }
-
-    addServerBalanceSubscription() {
-        this.addProviderBalanceSubscriptions()
-    }
-
-    addServerAccountSubscription() {
-        this.addProviderAccountSubscriptions()
-    }
-
-    // implement on provider class, registers for a new bar
-    abstract addProviderOrderSubscriptions(options: OrderSubscriptionOptions): any
-    abstract addProviderAccountSubscriptions(): any
-    abstract addProviderBalanceSubscriptions(): any
-
-
 
     //////////////////////
     // WebSocket Listener
+
+    // implement on provider class, registers for data from provider
+    abstract addProviderOrderSubscriptions(options: OrderSubscriptionOptions): any
+    abstract addProviderAccountSubscriptions(): any
+    abstract addProviderBalanceSubscriptions(): any
 
     startSocketListener(subscriptions: BrokerSubscriptionRequest[]) {
         const wsOptions = getProviderSocketOptionsByType(this.options, 'Broker', this.mode)
@@ -209,7 +159,8 @@ export abstract class BrokerProviderBase extends EventEmitter {
     abstract placeBrokerOrder(brokerOrder: any): void
 
     async placeOrder(orderRequest: OrderRequest) {
-        this.pendingOrderRequests.push(orderRequest)
+        this.orderManager.pendingOrders.push(orderRequest)
+        console.log('pending orders after', this.orderManager.pendingOrders)
         const brokerOrder = this.buildBrokerOrderFromRequest(orderRequest)
         return this.placeBrokerOrder(brokerOrder)
     }
@@ -217,73 +168,10 @@ export abstract class BrokerProviderBase extends EventEmitter {
     abstract getLastBrokerTrade(symbol: string): Promise<Number | undefined>
 
     handleOrderExecutionEvent(orderExecution: OrderExecution): void {
-        this.emitter(`${orderExecution.symbol}.orderExecution`, orderExecution)
-    }
-
-    processOrderExecution(orderExecution: OrderExecution) {
-        switch(orderExecution.executionType) {
-            case 'NEW':
-                const pending = this.pendingOrderRequests.find(p => p.id === orderExecution.orderId)
-                if (!pending) return            
-                return this.createOrderFromNewExecution(orderExecution, pending)
-            // case 'CANCELED':
-            // case 'EXPIRED':
-            default:
-                const active = this.activeOrders.find(a => a.id === orderExecution.orderId)
-                if (!active) return
-                return this.updateOrderFromExecution(orderExecution, active)
-        }
-    }
-
-    createOrderFromNewExecution(orderExecution: OrderExecution, pendingOrder: OrderRequest): Order {
-        return {
-            id: orderExecution.orderId,
-            botId: pendingOrder.botId || '',
-            symbol: orderExecution.symbol,
-            currency: pendingOrder.currency || 'USD',
-            side: orderExecution.orderSide,
-            type: orderExecution.orderType,
-            tif: orderExecution.tif,
-            status: orderExecution.orderStatus,
-            fillStatus: 'NONE',
-            price: orderExecution.priceRequested,
-            amount: orderExecution.amountRequested,
-            shares: pendingOrder.requestedShares,
-            lastFillPrice: orderExecution.lastTradePrice,
-            avgFillPrice: 0,
-            lastFillAmount: orderExecution.lastTradeAmount,
-            totalFillAmount: orderExecution.totalAmount,
-            trades: []
-        }
-    }
-
-    updateOrderFromExecution(orderExecution: OrderExecution, activeOrder: Order): Order {
-        const fillStatus = ['FILLED', 'PARTIALLY_FILLED'].includes(orderExecution.orderStatus) ? orderExecution.orderStatus : activeOrder.fillStatus
-        
-        if(orderExecution.tradeId) {
-            activeOrder.trades.push({
-                tradeId: orderExecution.tradeId, price: Number(orderExecution.lastTradePrice), shares: Number(orderExecution.lastTradeShares),
-                amount: Number(orderExecution.lastTradeAmount), commission: Number(orderExecution.commission)
-            })
-        }
-
-        return {
-            id: activeOrder.id,
-            botId: activeOrder.botId,
-            symbol: activeOrder.symbol,
-            currency: activeOrder.currency,
-            side: activeOrder.side,
-            type: activeOrder.type,
-            tif: activeOrder.tif,
-            status: orderExecution.orderStatus,
-            fillStatus: fillStatus as OrderFillStatus,
-            lastFillPrice: orderExecution.lastTradePrice,
-            avgFillPrice: divide(sum(activeOrder.trades.map(t => t.amount)), sum(activeOrder.trades.map(t => t.shares))),
-            lastFillAmount: orderExecution.lastTradeAmount,
-            totalFillAmount: orderExecution.totalAmount,
-            rejectReason: orderExecution.rejectReason,
-            trades: activeOrder.trades
-        }
+        const order = this.orderManager.processOrderExecution(orderExecution)
+        if (order) this.positionManager.updateWithOrder(order)
+        console.log('EXECUTION PROCESSED', order)
+        this.emit(`${orderExecution.symbol}.orderUpdate`, order)
     }
 
     handleAccountEvent(accountInfo: AccountInfo) {}

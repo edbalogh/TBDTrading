@@ -1,7 +1,7 @@
 import { BotDetails, SymbolDetails } from '../../common/definitions/strategy'
-import { Order  } from '../../common/definitions/broker'
 import { Bar, OrderBook } from '../../common/definitions/market-data'
 import { StrategyBase } from '../base/stategy-base'
+import { Order } from '../../connectors/positions/order-manager'
 
 export class BasicGrid extends StrategyBase {
     desiredLevels: number = 2

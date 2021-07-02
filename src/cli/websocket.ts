@@ -1,5 +1,6 @@
 import { Argv } from 'yargs'
 import { ProviderOptions } from '../common/definitions/connectors'
+import { BinanceBrokerSocketServer } from '../connectors/providers/binance/binance-broker-socket'
 import config from '../../config'
 const BinanceMarketData = require('../connectors/providers/binance/binance-market-data')
 const BinanceBroker = require('../connectors/providers/binance/binance-broker')
@@ -21,7 +22,7 @@ export function wsServer(yargs: Argv) {
         .argv
 
     const providerOptions: ProviderOptions = <any>config.providers.find(p => p.id === options.providerId)
-    const binance = options.connectionType === 'MarketData' ? new BinanceMarketData(providerOptions, 'LIVE') : new BinanceBroker(providerOptions, 'LIVE')
+    const binance = options.connectionType === 'MarketData' ? new BinanceMarketData(providerOptions, 'LIVE') : new BinanceBrokerSocketServer(providerOptions, 'LIVE')
     binance.startSocketServer()
 
     process.on('SIGINT', function () {

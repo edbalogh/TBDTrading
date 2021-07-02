@@ -1,7 +1,7 @@
 import { ProviderOptions, Connection, ProviderType, ProviderService, MarketDataSubscriptionRequest, BrokerSubscriptionRequest } from '../../common/definitions/connectors'
 import { BotDetails, OrderSizeOptions, SymbolDetails } from '../../common/definitions/strategy'
 import { Bar, OrderBook } from '../../common/definitions/market-data'
-import { Order, Position, OrderRequest, OrderExecution } from '../../common/definitions/broker'
+import { Order, OrderRequest, OrderExecution } from '../../connectors/positions/order-manager'
 import { Currency, Mode } from '../../common/definitions/basic'
 import config from '../../../config'
 import { findOne, insertOne, upsert } from '../../mongo/mongo-utils'
@@ -9,6 +9,7 @@ const utils = require('../../utils/legacy')
 
 import { generate as shortid } from 'shortid'
 import { OrderSizeCalculator } from './order-size-calculator'
+import { Position } from '../../connectors/positions/position-manager'
 
 export abstract class StrategyBase {
     botDetails: BotDetails
@@ -139,6 +140,7 @@ export abstract class StrategyBase {
         // const BrokerClass = require(location)
         // const broker = new BrokerClass(providerOptions, this.mode)
         this.brokerProvider.on(`${this.symbol?.symbol}.orderExecution`, (orderExecution: OrderExecution) => this._onOrderExecution(orderExecution))
+        this.brokerProvider.on(`${this.symbol?.symbol}.orderUpdate`, (order: Order) => this._onOrderUpdate(order))
 
         // start listener
         this.brokerProvider.startSocketListener(subscriptions)
@@ -160,7 +162,9 @@ export abstract class StrategyBase {
         const availableCapital = await this.brokerProvider.getAvailableCapital(orderRequest.currency || this.botDetails.baseCurrency);
         this.orderSizeCalculator.calculateOrderSize(finalOrderRequest, lastPrice, availableCapital)
        
-        this.brokerProvider.placeOrder(finalOrderRequest)
+        console.log('placing order', finalOrderRequest)
+        this.brokerProvider.pendingOrderRequests.push(finalOrderRequest)
+        this.brokerProvider.socketClient.emit('placeOrder', finalOrderRequest)
     }
 
     /**
@@ -178,6 +182,7 @@ export abstract class StrategyBase {
     }
 
     async _onOrderUpdate(order: Order): Promise<void> {
+        console.log('ON ORDER UPDATE', order)
         this.brokerProvider.activeOrders = this.brokerProvider.activeOrders.filter((o: Order) => o.id !== order.id)
         if (['LOST', 'REJECTED'].includes(order.status)) {
             this.brokerProvider.pendingOrderRequests = this.brokerProvider.pendingOrderRequests.filter((r: OrderRequest) => r.id !== order.id)
@@ -189,7 +194,7 @@ export abstract class StrategyBase {
     }
 
     async _onOrderExecution(orderExecution: OrderExecution) {
-        return this._onOrderUpdate(this.brokerProvider.processOrderExecution(orderExecution))
+        return this.onOrderExecution(orderExecution)
     }
 
     async _onOrderBookUpdate(book: OrderBook): Promise<void> {

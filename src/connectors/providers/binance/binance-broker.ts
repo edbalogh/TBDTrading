@@ -1,22 +1,22 @@
 import { BrokerProviderBase } from '../../base/broker-base'
-import { ExecutionType, OrderExecution, OrderStatus, OrderSide, OrderType, BrokerBalance, AccountInfo, Balance, OrderRequest} from '../../../common/definitions/broker'
+import { ExecutionType, OrderExecution, OrderStatus, OrderSide, OrderType, BrokerBalance, AccountInfo, Balance, OrderRequest} from '../../positions/order-manager'
 import { Mode } from '../../../common/definitions/basic'
 import { OrderSubscriptionOptions, ProviderOptions } from '../../../common/definitions/connectors'
 import { OutboundAccountInfo, ExecutionReport, BalanceUpdate, Balances, NewOrder, OrderSide as BrokerOrderSide, OrderType as BrokerOrderType, NewOcoOrder } from 'binance-api-node'
 import { barEpochTimeToUTC } from '../../../utils/datetime-helpers'
 import { floor } from 'lodash'
-import { number } from 'yargs'
 const Binance = require('binance-api-node').default
 
 const utils = require('../../../utils/legacy')
 
-export abstract class BinanceBroker extends BrokerProviderBase {
+export class BinanceBroker extends BrokerProviderBase {
     providerSocket: any
     exchangeInfo?: any
+    binanceClient: any
     
     constructor(options: ProviderOptions, mode: Mode) {
-        const client = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
-        super(options, mode, client)
+        super(options, mode)
+        this.binanceClient = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
     }
 
     async initialize() {
@@ -26,7 +26,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
 
     async getExchangeInfo(): Promise<any> {
         try {
-            const response = await this.client.exchangeInfo()
+            const response = await this.binanceClient.exchangeInfo()
             if (response.error) throw new Error(response.error)
             return response
         } catch(e) {
@@ -36,7 +36,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
 
     async getLastBrokerTrade(symbol: string): Promise<Number | undefined> {
         try {
-            const response = await this.client.prices({symbol})
+            const response = await this.binanceClient.prices({symbol})
             if (response.error) throw new Error(response.error)
             return Number(response[symbol])
         } catch(e) {
@@ -46,15 +46,13 @@ export abstract class BinanceBroker extends BrokerProviderBase {
 
     async getCurrentAccountInfo(): Promise<AccountInfo | undefined> {
         try {
-            const response = await this.client.accountInfo();
+            const response = await this.binanceClient.accountInfo();
             if (response.error) throw new Error(response.error);
             return this.translateAccountInfo(response);
         } catch(e) {
             utils.logDetails('error trying to get account info', e);
         }
     }
-
-
 
     ////////////////////
     // WebSocket Server
@@ -71,7 +69,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
 
     addProviderUserSubscriptions(): void {
         console.log('addProviderOrderSubscriptions')
-        this.providerSocket = this.client.ws.user((event: any) => {
+        this.providerSocket = this.binanceClient.ws.user((event: any) => {
             switch (event.eventType) {
                 case 'executionReport':
                     // console.log('binance execution event', event)
@@ -91,6 +89,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
         return {
             symbol: execution.symbol,
             orderId: execution.originalClientOrderId || execution.newClientOrderId,
+            isComplete: !execution.isOrderWorking,
             brokerOrderId: <string>(execution.orderId || execution.orderListId || ''),
             executionType: <ExecutionType>execution.executionType,
             executionTime: barEpochTimeToUTC(execution.orderTime),
@@ -209,7 +208,7 @@ export abstract class BinanceBroker extends BrokerProviderBase {
     async placeBrokerOrder(brokerOrder: any) {
         try {
             console.log('submitting order', brokerOrder)
-            const response = brokerOrder.listClientOrderId ? await this.client.orderOco(brokerOrder) : await this.client.order(brokerOrder);
+            const response = brokerOrder.listClientOrderId ? await this.binanceClient.orderOco(brokerOrder) : await this.binanceClient.order(brokerOrder);
             if (response.error) {
                 throw new Error(response.error);
             }
