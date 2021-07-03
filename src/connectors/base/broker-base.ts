@@ -4,13 +4,14 @@ import { EventEmitter } from 'events'
 import io from 'socket.io-client'
 import { OrderRequest, AccountInfo, OrderExecution, Order, OrderManager } from '../positions/order-manager'
 import { PositionManager } from '../positions/position-manager'
+import { Server, Socket } from 'socket.io'
 
 export type BrokerStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED'
 export interface BrokerOptions {
     id: string,
     name: string,
     class: string,
-    parameterDetails: Map<string, any>    
+    parameterDetails: Map<string, any>
 }
 
 
@@ -18,14 +19,14 @@ export abstract class BrokerProviderBase extends EventEmitter {
     id: string
     options: ProviderOptions
     mode: Mode
-    providerClient: any
     isActive: boolean = false
-    socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
+    providerServer?: Server     // represents the websocket server if instantiate for that purpose    
+    socketClient: any       // represents the websocket listener to the provider service (each class will instantiate one or the other)
     subscriptionHistory: any[] = []
     activeSymbols: string[] = []
     positionManager: PositionManager = new PositionManager()
     orderManager: OrderManager = new OrderManager()
-        
+
     constructor(options: ProviderOptions, mode: Mode) {
         super()
         if (!options.supportedModes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
@@ -105,6 +106,19 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     async initialize() { }
 
+    /**
+     * generic emitter that will either send to a websocket or local based on setup
+     * @param event event that is being sent out
+     * @param data data that goes with the event
+     */
+    emitter(event: string, data: any) {
+        this.providerServer ? this.providerServer.emit(event, data) : this.emit(event, data)
+    }
+
+    setProviderServer(server: Server) {
+        this.providerServer = server
+    }
+
     async getAvailableCapital(currency: Currency): Promise<number> {
         const capital = (await this.getCurrentAccountInfo(currency))?.balances.find(x => x.asset.toUpperCase() === currency.toUpperCase());
         return capital ? capital.available : 0;
@@ -131,18 +145,16 @@ export abstract class BrokerProviderBase extends EventEmitter {
             this.emit(event, ...args)
         })
 
-        this.socketClient.on('connect', () => {
-            if (subscriptions.length > 0) {
-                subscriptions.forEach((s: BrokerSubscriptionRequest) => {
-                    switch (s.type) {
-                        case 'ORDER':
-                            this.addProviderOrderSubscriptions(s.options)
-                            break
-                    }
-                })
-            }
+        // keep subscriptions in memory in case connection is reset
+        this.subscriptionHistory = this.subscriptionHistory.concat(subscriptions)
+
+        this.socketClient.on('connect', (socket: Socket) => {
+            // subscribe to events on the ProviderServer
             this.subscriptionHistory.forEach(h => {
-                this.socketClient.send(h.topic, h.options)
+                if (h.type === 'ORDER') {
+                    console.log('requesting ORDER subscription', h)
+                    this.socketClient.send('addOrderSubscriptions', h.options)
+                }
             })
         })
     }
@@ -160,7 +172,6 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     async placeOrder(orderRequest: OrderRequest) {
         this.orderManager.pendingOrders.push(orderRequest)
-        console.log('pending orders after', this.orderManager.pendingOrders)
         const brokerOrder = this.buildBrokerOrderFromRequest(orderRequest)
         return this.placeBrokerOrder(brokerOrder)
     }
@@ -169,11 +180,20 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     handleOrderExecutionEvent(orderExecution: OrderExecution): void {
         const order = this.orderManager.processOrderExecution(orderExecution)
+
+        console.log(`OrderExecutionEvent`, order)
+
+        if (!order) return
         if (order) this.positionManager.updateWithOrder(order)
-        console.log('EXECUTION PROCESSED', order)
-        this.emit(`${orderExecution.symbol}.orderUpdate`, order)
+        if (!order.isActive) {
+            console.log('SENDING ORDER FINISHED')
+            this.emitter(`${order.symbol}.orderFinished`, order)
+        }
+
+        console.log('SENDING ORDER UPDATED')
+        this.emitter(`${order.symbol}.orderUpdate`, order)
     }
 
-    handleAccountEvent(accountInfo: AccountInfo) {}
-    
+    handleAccountEvent(accountInfo: AccountInfo) { }
+
 }

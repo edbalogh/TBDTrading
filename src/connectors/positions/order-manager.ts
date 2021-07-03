@@ -96,10 +96,9 @@ export interface Trade {
     price: number,
     shares: number,
     amount: number,
-    commission: number
+    commission: number,
+    commissionAsset: string
 }
-
-
 
 export class OrderManager {
     activeOrders: Order[] = []
@@ -152,6 +151,8 @@ processOrderExecution(orderExecution: OrderExecution) {
             avgFillPrice: 0,
             lastFillAmount: orderExecution.lastTradeAmount,
             totalFillAmount: orderExecution.totalAmount,
+            lastFillShares: 0,
+            totalFillShares: 0,
             trades: []
         }
     }
@@ -159,10 +160,14 @@ processOrderExecution(orderExecution: OrderExecution) {
     updateOrderFromExecution(orderExecution: OrderExecution, activeOrder: Order): Order {
         const fillStatus = ['FILLED', 'PARTIALLY_FILLED'].includes(orderExecution.orderStatus) ? orderExecution.orderStatus : activeOrder.fillStatus
         
+        // calculate shares and amount in case where one is missing
+        const shares = orderExecution.lastTradeShares || divide(Number(orderExecution.lastTradeAmount), Number(orderExecution.lastTradePrice))
+        const amount = orderExecution.lastTradeAmount || Number(orderExecution.lastTradeShares) * Number(orderExecution.lastTradePrice)
         if(orderExecution.tradeId) {
+            activeOrder.trades = activeOrder.trades.filter(t => t.tradeId !== orderExecution.tradeId)
             activeOrder.trades.push({
-                tradeId: orderExecution.tradeId, price: Number(orderExecution.lastTradePrice), shares: Number(orderExecution.lastTradeShares),
-                amount: Number(orderExecution.lastTradeAmount), commission: Number(orderExecution.commission)
+                tradeId: orderExecution.tradeId, price: Number(orderExecution.lastTradePrice), shares, amount,
+                commission: Number(orderExecution.commission), commissionAsset: <string>orderExecution.commissionAsset
             })
         }
 
@@ -181,6 +186,8 @@ processOrderExecution(orderExecution: OrderExecution) {
             avgFillPrice: divide(sum(activeOrder.trades.map(t => t.amount)), sum(activeOrder.trades.map(t => t.shares))),
             lastFillAmount: orderExecution.lastTradeAmount,
             totalFillAmount: orderExecution.totalAmount,
+            lastFillShares: orderExecution.lastTradeShares,
+            totalFillShares: orderExecution.totalShares,
             rejectReason: orderExecution.rejectReason,
             trades: activeOrder.trades
         }

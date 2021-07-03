@@ -23,6 +23,8 @@ export abstract class StrategyBase {
     supportsFractionalShares: boolean = false
     orderSizeCalculator: OrderSizeCalculator
     orderSizeOptions: OrderSizeOptions
+    orderErrors: any[] = []
+    orderErrorStreak: number = 0
 
     constructor(botDetails: BotDetails, symbolDetails: SymbolDetails) {
         this.botDetails = botDetails
@@ -137,13 +139,22 @@ export abstract class StrategyBase {
     }
 
     addBrokerListener(providerOptions: ProviderOptions, subscriptions: BrokerSubscriptionRequest[] | undefined): void {
-        // const BrokerClass = require(location)
-        // const broker = new BrokerClass(providerOptions, this.mode)
         this.brokerProvider.on(`${this.symbol?.symbol}.orderExecution`, (orderExecution: OrderExecution) => this._onOrderExecution(orderExecution))
         this.brokerProvider.on(`${this.symbol?.symbol}.orderUpdate`, (order: Order) => this._onOrderUpdate(order))
+        this.brokerProvider.on(`${this.symbol?.symbol}.orderFinished`, (order: Order) => this._onOrderFinished(order))
+        this.brokerProvider.on(`${this.symbol?.symbol}.orderFailed`, (data: any) => this._onOrderRequestFailed(data))
+        this.brokerProvider.on(`${this.symbol?.symbol}.orderPlaced`, (data: any) => this._onOrderRequestSuccess(data))
+
+        const updatedSubscriptions = subscriptions?.map(s => {
+            if(s.type === 'ORDER') {
+                if(!s.options.symbols) s.options.symbols = []
+                s.options.symbols.push(this.symbol.symbol)
+            }
+            return s
+        })
 
         // start listener
-        this.brokerProvider.startSocketListener(subscriptions)
+        this.brokerProvider.startSocketListener(updatedSubscriptions)
         this.connections.push({ class: providerOptions.id, options: providerOptions })
         return
     }
@@ -163,7 +174,7 @@ export abstract class StrategyBase {
         this.orderSizeCalculator.calculateOrderSize(finalOrderRequest, lastPrice, availableCapital)
        
         console.log('placing order', finalOrderRequest)
-        this.brokerProvider.pendingOrderRequests.push(finalOrderRequest)
+        this.brokerProvider.orderManager.pendingOrders.push(finalOrderRequest)
         this.brokerProvider.socketClient.emit('placeOrder', finalOrderRequest)
     }
 
@@ -183,11 +194,12 @@ export abstract class StrategyBase {
 
     async _onOrderUpdate(order: Order): Promise<void> {
         console.log('ON ORDER UPDATE', order)
-        this.brokerProvider.activeOrders = this.brokerProvider.activeOrders.filter((o: Order) => o.id !== order.id)
+        if(!order) return
+        this.brokerProvider.orderManager.activeOrders = this.brokerProvider.orderManager.activeOrders.filter((o: Order) => o.id !== order.id)
         if (['LOST', 'REJECTED'].includes(order.status)) {
-            this.brokerProvider.pendingOrderRequests = this.brokerProvider.pendingOrderRequests.filter((r: OrderRequest) => r.id !== order.id)
+            this.brokerProvider.orderManager.pendingOrders = this.brokerProvider.orderManager.pendingOrders.filter((r: OrderRequest) => r.id !== order.id)
         } else if (['OPEN', 'PARTIALLY_FILLED', 'FILLED'].includes(order.status)) {
-            this.brokerProvider.activeOrders.push(order)
+            this.brokerProvider.orderManager.activeOrders.push(order)
         }
 
         return this.onOrderUpdate(order)
@@ -197,15 +209,26 @@ export abstract class StrategyBase {
         return this.onOrderExecution(orderExecution)
     }
 
+    _onOrderRequestFailed(results: any) {
+        this.brokerProvider.orderManager.pendingOrders = this.brokerProvider.orderManager.pendingOrders.filter((o: OrderRequest) => o.id !== results.orderRequest.id)
+        this.orderErrorStreak++
+        this.orderErrors.push({ time: new Date(), error: results.error })
+        console.log(`order placement failed,reason=${results.error},streak=${this.orderErrorStreak}`, this.orderErrors)
+    }
+
+    _onOrderRequestSuccess(results: any) {
+        this.orderErrorStreak = 0
+    }
+
+    async _onOrderFinished(order: Order) {
+        return this.onOrderFinished(order)
+    }
+
     async _onOrderBookUpdate(book: OrderBook): Promise<void> {
         return this.onOrderBookUpdate(book)
     }
 
-    async _onOrderComplete(order: Order): Promise<void> {
-        return this.onOrderUpdate(order)
-    }
-
-    async onOrderComplete(order: Order): Promise<void> { }
+    async onOrderFinished(order: Order): Promise<void> { }
     async onNextBar(bar: Bar): Promise<void> { }
     async onOrderBookUpdate(book: OrderBook): Promise<void> { }
     async onOrderUpdate(order: Order): Promise<void> { }

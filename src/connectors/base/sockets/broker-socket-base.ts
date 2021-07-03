@@ -1,5 +1,5 @@
 import { WebSocketServerBase } from './websocket-base'
-import { BrokerSubscriptionRequest, OrderSubscriptionOptions, ProviderOptions } from '../../../common/definitions/connectors'
+import { OrderSubscriptionOptions, ProviderOptions } from '../../../common/definitions/connectors'
 import { Mode } from '../../../common/definitions/basic'
 import { Socket } from 'socket.io'
 import { last } from 'lodash'
@@ -17,6 +17,7 @@ export abstract class BrokerSocketServerBase extends WebSocketServerBase {
 
     startSocketServer() {
         this.startServer()
+        if (this.socketServer) this.brokerProvider.setProviderServer(this.socketServer)
         this.registerEvents()
         this.handleAccountSubscriptionRequest('server')
     }
@@ -53,10 +54,17 @@ export abstract class BrokerSocketServerBase extends WebSocketServerBase {
                 this.removeConnectionFromAllSubscriptions(socket.id)
             })
 
-            socket.on('placeOrder', (orderRequest: OrderRequest) => {
+            socket.on('placeOrder', async (orderRequest: OrderRequest) => {
                 console.log('SERVER: PlaceOrder', orderRequest)
-                const results = this.brokerProvider.placeOrder(orderRequest)
-                socket.emit('placeOrder_results', results)
+                try {
+                    const results = await this.brokerProvider.placeOrder(orderRequest)
+                    console.log('ORDER PLACED')
+                    console.log(results)
+                    socket.emit(`${orderRequest.symbol}.orderPlaced`, results)
+                } catch(e) {
+                    console.log(`order placement failed,reason=${e.message}`, { orderRequest, error: e})
+                    socket.emit(`${orderRequest.symbol}.orderFailed`, { orderRequest, error: e.message})
+                }
             })
 
             socket.on('message', (requestType: BrokerRequestType, options: any) => {

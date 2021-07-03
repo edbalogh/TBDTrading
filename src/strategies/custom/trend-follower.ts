@@ -50,12 +50,18 @@ export class TrendFollower extends StrategyBase {
 
     attemptNewPosition() {
         // lastBar is red, this currentBar is green
-        // lastBar.volume is < currentBar.volume
+        // lastBar.volume  || currentBar.volume > 2x avg volume
     }
 
     evaluateExistingPosition() {
-        // higher high and higher low (or vice versa)?  yes? highly aggressive
-        // else set stop limit at last low for 1/2 original position
+        // signs of strength (long position, hold, or add position)
+        //   * higher high, higher low, higher close
+        //   * small tails (especially on bottom tail)
+        // signs of weakness (hold, or partial exit)
+        //   * red bar
+        //   * long tails
+        // signs of danger (consider exiting position)
+        //   * red bar with larger volume
     }
 }
 

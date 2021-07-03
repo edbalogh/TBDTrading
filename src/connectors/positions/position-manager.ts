@@ -1,5 +1,6 @@
 import shortid from "shortid";
-import { Order } from "./order-manager";
+import { Order, OrderSide } from "./order-manager";
+import { findOne, insertOne, upsert } from '../../mongo/mongo-utils'
 
 export type PositionStatus = 'ACTIVE' | 'CLOSED'
 export interface Position {
@@ -7,8 +8,11 @@ export interface Position {
     botId: string,
     status: PositionStatus,
     symbol: string,
+    originalSide: OrderSide,
     currentShares: number,  // negative is short, positive is long
-    sharesOnOrder: number,
+    currentCapital: number,
+    totalCapital: number,
+    maxExposure: number,
     orders: Order[]
 }
 
@@ -21,7 +25,7 @@ export class PositionManager {
 
     updateWithOrder(order: Order): Position | undefined {
         // find position in active positions
-        let position = this.activePositions.find(p => p.orders.map(o=> o.id).includes(order.id))
+        let position = this.activePositions.find(p => p.symbol === order.symbol && p.botId === order.botId)
 
         switch (order.status) {
             case 'OPEN':
@@ -43,13 +47,17 @@ export class PositionManager {
     }
 
     createNewPositionFromOrder(order: Order): Position {
+        const sharesOnOrder = Number(order.shares) - Number(order.totalFillShares)
         return {
             id: shortid(),
             botId: order.botId,
             status: 'ACTIVE',
             symbol: order.symbol,
+            originalSide: order.side,
             currentShares: Number(order.totalFillShares),
-            sharesOnOrder: Number(order.shares) - Number(order.totalFillShares),
+            currentCapital: Number(order.totalFillAmount),
+            totalCapital: Number(order.totalFillAmount),
+            maxExposure: Number(order.totalFillAmount),
             orders: [order]
         }
     }
@@ -69,7 +77,7 @@ export class PositionManager {
 
     processClosedOrder(order: Order, position: Position): Position {
         position = this.updateExistingPosition(position, order)
-        if (position.currentShares === 0 && position.sharesOnOrder === 0) {
+        if (position.currentShares === 0 && !position.orders.find(o => o.isActive)) {
             position.status === 'CLOSED'
             this.closedPositions.push(position)
         } else {
@@ -85,11 +93,20 @@ export class PositionManager {
         position.orders.push(order)
 
         if(order.isActive) {
-            // TODO: update current shares, sharesOnOrder, etc...
+            // TODO: update current shares, sharesOnOrder, etc... by recalculating from the orders
         } else {
             // adjust sharesOnOrder to remove any unfilled shares (error, cancel, etc...)
         }
-
+        this.savePosition(position)
         return position
+    }
+
+    async savePosition(position: Position) {
+        console.log('SAVING POSITION')
+        return upsert('positions', position, {id: position.id})
+    }
+
+    async restorePositions(filter: any = {}) {
+        // TODO: grab all positions from mongo
     }
 }

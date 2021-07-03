@@ -1,6 +1,6 @@
 
 import { OrderSizeDetails, OrderSizeOptions } from '../../common/definitions/strategy'
-import { OrderRequest } from '../../common/definitions/broker'
+import { OrderRequest } from '../../connectors/positions/order-manager'
 import { floor, divide } from 'lodash'
 import { findOne, insertOne, upsert } from '../../mongo/mongo-utils'
 const utils = require('../../utils/legacy')

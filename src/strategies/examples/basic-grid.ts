@@ -12,17 +12,31 @@ export class BasicGrid extends StrategyBase {
     }
 
     async onOrderUpdate(order: Order) {
-        console.log('strategy order update', order)
+        console.log('order update', order)
        // TODO: when order has been filled, place order on opposite side at next level
+    }
+
+    async onOrderFinished(order: Order) {
+        console.log('order finished', order)
     }
 
     async onNextBar(bar: Bar) {
         // TODO: check existing orders vs expected grid orders
         console.log(bar)
-        if(this.position && this.position?.currentShares > 0) return
-        if(this.brokerProvider.activeOrders.length + this.brokerProvider.pendingOrderRequests.length > 0) return
+        if(this.position && this.position?.currentShares > 0) {
+            this.evaluateExit()
+            return
+        }
+        if(this.brokerProvider.orderManager.activeOrders.length + this.brokerProvider.orderManager.pendingOrders.length > 0) return
         return this.placeOrder({
             symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100
+        })
+    }
+
+    async evaluateExit() {
+        if(this.position?.orders.find(o => o.isActive)) return
+        return this.placeOrder({
+            symbol: this.symbol.symbol, side: 'SELL', type: 'MARKET', isExit: true, requestedShares: this.position?.currentShares
         })
     }
 

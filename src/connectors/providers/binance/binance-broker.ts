@@ -73,6 +73,7 @@ export class BinanceBroker extends BrokerProviderBase {
             switch (event.eventType) {
                 case 'executionReport':
                     // console.log('binance execution event', event)
+                    if(event.newClientOrderId.startsWith('web_')) return    // ignore any orders placed in the webui for now
                     super.handleOrderExecutionEvent(this.translateOrderExecution(event))                    
                     break
                 case 'account':
@@ -86,6 +87,7 @@ export class BinanceBroker extends BrokerProviderBase {
 
     // Translators
     translateOrderExecution(execution: ExecutionReport): OrderExecution {
+        console.log(execution)
         return {
             symbol: execution.symbol,
             orderId: execution.originalClientOrderId || execution.newClientOrderId,
@@ -100,8 +102,8 @@ export class BinanceBroker extends BrokerProviderBase {
             tif: execution.timeInForce,
             rejectReason: execution.orderRejectReason,
             sharesRequested: Number(execution.quantity),
-            lastTradeShares: Number(execution.lastQuoteTransacted),
-            totalShares: Number(execution.totalQuoteTradeQuantity),
+            lastTradeShares: Number(execution.lastTradeQuantity),
+            totalShares: Number(execution.totalTradeQuantity),
             priceRequested: Number(execution.price),
             lastTradePrice: Number(execution.priceLastTrade),
             amountRequested: Number(execution.quoteOrderQuantity),

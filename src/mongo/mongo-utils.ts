@@ -44,7 +44,7 @@ export async function findOne(collection: string, query: any, database?: string)
 
 export async function upsert(collection: string, document: any, query: any, database?: any): Promise<any> {
     const cb = async (cln: Collection) => {
-        return await cln.updateOne(document, query, { upsert: true })
+        return await cln.replaceOne(query, document, { upsert: true })
     }
     return collectionProcessor(collection, cb, database)
 }
