@@ -95,6 +95,7 @@ export interface Trade {
     tradeId: string,
     price: number,
     shares: number,
+    side: OrderSide,
     amount: number,
     commission: number,
     commissionAsset: string
@@ -166,7 +167,7 @@ processOrderExecution(orderExecution: OrderExecution) {
         if(orderExecution.tradeId) {
             activeOrder.trades = activeOrder.trades.filter(t => t.tradeId !== orderExecution.tradeId)
             activeOrder.trades.push({
-                tradeId: orderExecution.tradeId, price: Number(orderExecution.lastTradePrice), shares, amount,
+                tradeId: orderExecution.tradeId, price: Number(orderExecution.lastTradePrice), shares, side: orderExecution.orderSide, amount,
                 commission: Number(orderExecution.commission), commissionAsset: <string>orderExecution.commissionAsset
             })
         }

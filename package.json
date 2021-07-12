@@ -11,7 +11,10 @@
     "start": "node ./build/src/index.js",
     "dev": "ts-node ./src/index.ts",
     "dev:nodemon": "nodemon -w src -e ts,json -x ts-node ./src/index.ts",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "start-broker-server": "tbd wsServer -t Broker -i binance",
+    "start-market-server": "tbd wsServer -t MarketData -i binance",
+    "start-basic-grid": "tbd startExampleBot -b basic-grid-bot"
   },
   "keywords": [
     "express",

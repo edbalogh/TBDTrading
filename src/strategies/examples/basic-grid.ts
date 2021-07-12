@@ -27,7 +27,7 @@ export class BasicGrid extends StrategyBase {
             this.evaluateExit()
             return
         }
-        if(this.brokerProvider.orderManager.activeOrders.length + this.brokerProvider.orderManager.pendingOrders.length > 0) return
+        if(this.activeOrders.length + this.pendingOrders.length > 0) return
         return this.placeOrder({
             symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100
         })

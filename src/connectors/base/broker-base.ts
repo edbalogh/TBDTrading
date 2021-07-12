@@ -184,14 +184,14 @@ export abstract class BrokerProviderBase extends EventEmitter {
         console.log(`OrderExecutionEvent`, order)
 
         if (!order) return
-        if (order) this.positionManager.updateWithOrder(order)
+        const position = this.positionManager.updateWithOrder(order)
         if (!order.isActive) {
             console.log('SENDING ORDER FINISHED')
-            this.emitter(`${order.symbol}.orderFinished`, order)
+            this.emitter(`${order.symbol}.orderFinished`, {order, position})
         }
 
         console.log('SENDING ORDER UPDATED')
-        this.emitter(`${order.symbol}.orderUpdate`, order)
+        this.emitter(`${order.symbol}.orderUpdate`, {order, position})
     }
 
     handleAccountEvent(accountInfo: AccountInfo) { }

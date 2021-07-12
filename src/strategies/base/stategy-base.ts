@@ -20,6 +20,10 @@ export abstract class StrategyBase {
     mode: Mode
     position?: Position
     brokerProvider: any
+    pendingOrders: OrderRequest[] = []
+    activeOrders: Order[] = []
+    activePosition?: Position
+    closedPositions: Position[] = []
     supportsFractionalShares: boolean = false
     orderSizeCalculator: OrderSizeCalculator
     orderSizeOptions: OrderSizeOptions
@@ -192,17 +196,18 @@ export abstract class StrategyBase {
         return bar
     }
 
-    async _onOrderUpdate(order: Order): Promise<void> {
-        console.log('ON ORDER UPDATE', order)
-        if(!order) return
-        this.brokerProvider.orderManager.activeOrders = this.brokerProvider.orderManager.activeOrders.filter((o: Order) => o.id !== order.id)
-        if (['LOST', 'REJECTED'].includes(order.status)) {
-            this.brokerProvider.orderManager.pendingOrders = this.brokerProvider.orderManager.pendingOrders.filter((r: OrderRequest) => r.id !== order.id)
-        } else if (['OPEN', 'PARTIALLY_FILLED', 'FILLED'].includes(order.status)) {
-            this.brokerProvider.orderManager.activeOrders.push(order)
+    async _onOrderUpdate(data: any): Promise<void> {
+        console.log('ON ORDER UPDATE', data.order, data.position)
+        if(!data.order) return
+        this.activeOrders = this.activeOrders.filter((o: Order) => o.id !== data.order.id)
+        this.pendingOrders = this.pendingOrders.filter((r: OrderRequest) => r.id !== data.order.id)
+        if (data.order.isActive) {
+            this.activeOrders.push(data.order)
         }
 
-        return this.onOrderUpdate(order)
+        // refresh position
+        this.position = data.position.status === 'ACTIVE' ? data.position : undefined
+        return this.onOrderUpdate(data.order)
     }
 
     async _onOrderExecution(orderExecution: OrderExecution) {
