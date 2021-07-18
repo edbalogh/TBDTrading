@@ -1,6 +1,6 @@
 #!/usr/bin/env ts-node
 
-import { startExampleBot } from './src/cli/bots/bots' 
+import { startBot } from './src/cli/bots/bots' 
 import { OrderBook } from './src/common/definitions/market-data';
 import yargs, { Argv } from 'yargs'
 import { ProviderOptions } from './src/common/definitions/connectors'
@@ -25,8 +25,11 @@ yargs
     .command('wsListener', 'Start WebSocket Listener', (yargs: Argv) => {
         return wsClient(yargs)
     })
-    .command('startExampleBot', 'Start Bot', (yargs: Argv) => {
-        return startExampleBot(yargs)
+    .command('startExampleBot', 'Start Example Bot', (yargs: Argv) => {
+        return startBot(yargs, 'example')
+    }) 
+    .command('startCustomBot', 'Start Custom Bot', (yargs: Argv) => {
+        return startBot(yargs, 'custom')
     })  
     .command('execution', 'Start Execution', (yargs: Argv) => {
         return executeStrategy(yargs)

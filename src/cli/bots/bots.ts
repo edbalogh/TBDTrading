@@ -1,6 +1,6 @@
 import { Argv } from 'yargs'
 
-export function startExampleBot(yargs: Argv) {
+export function startBot(yargs: Argv, folder: string) {
     const options = yargs
         .options('bot', {
             describe: 'bot',
@@ -10,7 +10,7 @@ export function startExampleBot(yargs: Argv) {
         .argv  
 
     const botDetails = require(`./bot-details/${options.bot}`)
-    const Bot = require(`../../../src/strategies/examples/${botDetails.strategyOptions.class}`)
+    const Bot = require(`../../../src/strategies/${folder}/${botDetails.strategyOptions.class}`)
     const bot = new Bot(botDetails, botDetails.symbols[0])
 
     process.on('SIGINT', function () {

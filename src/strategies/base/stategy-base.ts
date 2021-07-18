@@ -5,11 +5,16 @@ import { Order, OrderRequest, OrderExecution } from '../../connectors/positions/
 import { Currency, Mode } from '../../common/definitions/basic'
 import config from '../../../config'
 import { findOne, insertOne, upsert } from '../../mongo/mongo-utils'
+import { AggregatedBar, BarAggregator } from '../aggregators/bar-aggregator'
 const utils = require('../../utils/legacy')
 
 import { generate as shortid } from 'shortid'
 import { OrderSizeCalculator } from './order-size-calculator'
 import { Position } from '../../connectors/positions/position-manager'
+
+export interface Bars {
+    [key: string]: BarAggregator
+}
 
 export abstract class StrategyBase {
     botDetails: BotDetails
@@ -29,6 +34,7 @@ export abstract class StrategyBase {
     orderSizeOptions: OrderSizeOptions
     orderErrors: any[] = []
     orderErrorStreak: number = 0
+    bars: Bars = {}
 
     constructor(botDetails: BotDetails, symbolDetails: SymbolDetails) {
         this.botDetails = botDetails
@@ -177,7 +183,7 @@ export abstract class StrategyBase {
         const availableCapital = await this.brokerProvider.getAvailableCapital(orderRequest.currency || this.botDetails.baseCurrency);
         this.orderSizeCalculator.calculateOrderSize(finalOrderRequest, lastPrice, availableCapital)
        
-        console.log('placing order', finalOrderRequest)
+        console.log('PLACING ORDER', finalOrderRequest)
         this.brokerProvider.orderManager.pendingOrders.push(finalOrderRequest)
         this.brokerProvider.socketClient.emit('placeOrder', finalOrderRequest)
     }
@@ -187,8 +193,12 @@ export abstract class StrategyBase {
      * @param bar bar data from market data event
      */
     async _onBarUpdate(bar: Bar): Promise<void> {
-        bar = this.addBarIndicators(bar)
-        return this.onNextBar(bar)
+        if(!this.bars[bar.timeframe]) {
+            console.log(`creating bar container for ${bar.timeframe}`)
+            this.bars[bar.timeframe] = new BarAggregator({botId: this.botId, symbol: this.symbol.symbol, mode: this.mode, timeframe: bar.timeframe, barsToPrime: 1})
+        }
+        const aggBar = await this.bars[bar.timeframe].updateBars(bar)
+        if(aggBar) return this.onNextBar(aggBar)
     }
 
     addBarIndicators(bar: Bar): Bar {
@@ -197,7 +207,7 @@ export abstract class StrategyBase {
     }
 
     async _onOrderUpdate(data: any): Promise<void> {
-        console.log('ON ORDER UPDATE', data.order, data.position)
+        // console.log('ON ORDER UPDATE', data.order, data.position)
         if(!data.order) return
         this.activeOrders = this.activeOrders.filter((o: Order) => o.id !== data.order.id)
         this.pendingOrders = this.pendingOrders.filter((r: OrderRequest) => r.id !== data.order.id)
@@ -234,7 +244,7 @@ export abstract class StrategyBase {
     }
 
     async onOrderFinished(order: Order): Promise<void> { }
-    async onNextBar(bar: Bar): Promise<void> { }
+    async onNextBar(bar: AggregatedBar): Promise<void> { }
     async onOrderBookUpdate(book: OrderBook): Promise<void> { }
     async onOrderUpdate(order: Order): Promise<void> { }
     async onOrderExecution(orderExecution: OrderExecution): Promise<void> { }

@@ -1,0 +1,54 @@
+{
+    "id": "trend-test1",
+    "name": "trend-binance-test",
+    "mode": "LIVE",
+    "status": "ACTIVE",
+    "providers": [
+        {
+            "providerId": "binance",
+            "providerType": "MarketData",
+            "subscriptions": [
+                {
+                    "type": "BAR",
+                    "options": {
+                        "timeframe": "1m",
+                        "showActive": false
+                    }
+                }
+            ]
+        },
+        {
+            "providerId": "binance",
+            "providerType": "Broker",
+            "subscriptions": [
+                {
+                    "type": "ORDER",
+                    "options": {}
+                }
+            ]
+        }
+    ],
+    "symbols": [
+        {
+            "symbol": "ADAUSDT",
+            "status": "ACTIVE",
+            "providerId": "binance",
+            "reference": false,
+            "pair": [ "ADA", "USDT" ]
+        }
+    ],
+    "baseCurrency": "USDT",
+    "promotedFrom": "cli",
+    "strategyOptions": {
+        "id": "trend-follower",
+        "name": "trend-follower",
+        "class": "trend-follower",
+        "parameterDetails": {},
+        "orderSizeOptions": {
+            "supportsFractionalShares": true,
+            "tradeSizeAmount": 25,
+            "maxCapitalPerSymbol": 100,
+            "maxCapitalPerStrategy": 500
+        }
+    }
+}
