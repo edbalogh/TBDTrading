@@ -22,11 +22,11 @@ yargs
     .command('wsServer', 'Start a WebSocket Server', (yargs: Argv) => {
         return wsServer(yargs)
     })
-    .command('wsListener', 'Start WebSocket Listener', (yargs: Argv) => {
+    .command('wsClient', 'Start WebSocket Listener', (yargs: Argv) => {
         return wsClient(yargs)
     })
     .command('startExampleBot', 'Start Example Bot', (yargs: Argv) => {
-        return startBot(yargs, 'example')
+        return startBot(yargs, 'examples')
     }) 
     .command('startCustomBot', 'Start Custom Bot', (yargs: Argv) => {
         return startBot(yargs, 'custom')

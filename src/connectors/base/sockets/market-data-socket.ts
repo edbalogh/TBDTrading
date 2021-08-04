@@ -25,20 +25,19 @@ export class MarketDataSocketServer extends WebSocketServerBase {
             })
 
             socket.on('message', (requestType: MarketDataRequestType, options: LiveBarOptions | LiveOrderBookOptions | LiveTradeOptions) => {
-                console.log('received message', requestType)
-                let finalOptions;
+                console.log('received message', requestType, JSON.stringify(options))
                 switch (requestType) {
                     case 'addBarSubscriptions':
-                        finalOptions = this.handleBarSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
-                        socket.emit('addSubscription_success', finalOptions)
+                        const finalBarOptions = this.handleBarSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
+                        socket.emit('addSubscription_success', finalBarOptions)
                         break
                     case 'addBookSubscriptions':
-                        finalOptions = this.handleBookSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
-                        socket.emit('addSubscription_success', finalOptions)
+                        const finalBookOptions = this.handleBookSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
+                        socket.emit('addSubscription_success', finalBookOptions)
                         break
                     case 'addTradeSubscriptions':
-                        finalOptions = this.handleTradeSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
-                        socket.emit('addSubscription_success', finalOptions)
+                        const finalTradeOptions = this.handleTradeSubscriptionRequests(socket.id, options, eventCallBacks.get(requestType))
+                        socket.emit('addSubscription_success', finalTradeOptions)
                         break
                     default:
                         console.log(`unknown market data request type ${requestType}`)
@@ -50,7 +49,7 @@ export class MarketDataSocketServer extends WebSocketServerBase {
 
     handleBarSubscriptionRequests(connectionId: string, options: LiveBarOptions, cb?: Function) {
         if (!cb) throw new Error('no callback found for addBarSubscriptions event')
-        console.log(`registering new bar subscription for connection ${connectionId}`)
+        console.log(`registering new bar subscription for connection ${connectionId}`, JSON.stringify(options))
         const newSymbols: string[] = []
         options.symbols.map((s:string) => {
             const subOptions = { symbols: s, timeframe: options.timeframe }

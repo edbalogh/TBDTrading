@@ -16,8 +16,8 @@ export abstract class BrokerSocketServerBase extends WebSocketServerBase {
     }
 
     startSocketServer() {
-        this.startServer()
-        if (this.socketServer) this.brokerProvider.setProviderServer(this.socketServer)
+        const socketServer = this.startServer()
+        this.brokerProvider.setProviderServer(socketServer)
         this.registerEvents()
         this.handleAccountSubscriptionRequest('server')
     }
@@ -59,7 +59,6 @@ export abstract class BrokerSocketServerBase extends WebSocketServerBase {
                 try {
                     const results = await this.brokerProvider.placeOrder(orderRequest)
                     console.log('ORDER PLACED')
-                    console.log(results)
                     socket.emit(`${orderRequest.symbol}.orderPlaced`, results)
                 } catch(e) {
                     console.log(`order placement failed,reason=${e.message}`, { orderRequest, error: e})
@@ -69,10 +68,9 @@ export abstract class BrokerSocketServerBase extends WebSocketServerBase {
 
             socket.on('message', (requestType: BrokerRequestType, options: any) => {
                 console.log('received message', requestType)
-                let finalOptions;
                 switch (requestType) {
                     case 'addOrderSubscriptions':
-                        finalOptions = this.handleOrderSubscriptionRequests(socket.id, options as OrderSubscriptionOptions)
+                        const finalOptions = this.handleOrderSubscriptionRequests(socket.id, options as OrderSubscriptionOptions)
                         socket.emit('addSubscription_success', finalOptions)
                         break
                     default:

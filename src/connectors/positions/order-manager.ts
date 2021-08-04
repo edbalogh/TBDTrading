@@ -40,10 +40,10 @@ export interface AccountInfo {
 }
 
 export interface Balance {
-    asset: string,
-    total: number,
-    available: number,
-    inOrder: number
+    asset: string,              // currency for the balance (ie. USD, BTC, etc...)
+    total: number,              // total amount available (including inOrder)
+    available: number,          // actual amount available for trading (excluding inOrder)
+    inOrder: number             // amount that is currently allocated to active orders
 }
 
 export interface BrokerBalance {
@@ -64,7 +64,8 @@ export interface OrderRequest {
     stopLimitPrice?: number,
     requestedAmount?: number,
     requestedShares?: number,
-    isExit: boolean
+    isExit: boolean,
+    brokerSpecificOptions?: any
 }
 
 export interface Order {

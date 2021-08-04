@@ -13,7 +13,7 @@ export interface BarAggregatorOptions {
     bulkSaveLimit?: number,
     bulkMinToKeep?: number,
     barsToPrime?: number,
-    indicatorSettings?: Map<string, any>
+    indicatorSettings?: any
 }
 
 export interface AggregatedBar extends Bar {
@@ -88,14 +88,14 @@ export class BarAggregator {
         aggBar.id = shortid.generate();
         aggBar.processTime = new Date();
         aggBar.botId = this.botId;
-        aggBar.indicators = this._updateIndicators(aggBar);
-        this.bars.push(aggBar);
+        aggBar.indicators = this._updateIndicators(aggBar);        
 
         if (!this.ready && size(this.bars) >= this.barsToPrime) this.ready = true;
 
         this.activeBar = aggBar
 
         if(aggBar.inProgress) return
+        this.bars.push(aggBar);
         if(!this.bulkUpdates) upsert('bars', aggBar, { id: aggBar.id })
         if (this.bars.length > this.bulkSaveLimit + this.bulkMinToKeep) {
             await this.saveBars(this.bars);

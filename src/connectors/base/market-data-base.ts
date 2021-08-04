@@ -4,27 +4,32 @@ import { HistoricalBarOptions, Bar, OrderBook, Trade } from '../../common/defini
 import { EventEmitter } from 'events'
 import { MarketDataSocketServer } from './sockets/market-data-socket'
 import { MarketDataRequestType } from '../../common/definitions/websocket'
+import { Server, Socket } from 'socket.io'
 import io from 'socket.io-client'
+import { json } from 'express'
 
 export abstract class MarketDataProviderBase extends EventEmitter {
     id: string
     options: ProviderOptions
     mode: Mode
-    client: any
+    spotApi?: any
+    futuresApi?: any
     isActive: boolean = false
     activeSymbols: string[] = []
-    socketClient: any   // TODO: marketListener since it could be one of many types of connections to provider
+    socketClient?: any
     providerServer?: MarketDataSocketServer
+    providerClient: any
     subscriptionHistory: any[] = []
+    spotEnabled: boolean = false
+    futuresEnabled: boolean = false
 
-    constructor(options: ProviderOptions, mode: Mode, client: any) {
+    constructor(options: ProviderOptions, mode: Mode) {
         super()
         if (!options.supportedModes.includes(mode)) throw new Error(`Provider ${options.id} does not support mode '${mode}'`)
         if (!options.scriptLocations.find(s => s.type === 'MarketData')) throw new Error(`Provider ${options.id} does not support providerType 'MarketData'`)
         this.id = options.id
         this.options = options
         this.mode = mode
-        this.client = client
     }
 
     /**
@@ -134,7 +139,7 @@ export abstract class MarketDataProviderBase extends EventEmitter {
      */
     getLiveBarData(options: LiveBarOptions) {
         this.subscriptionHistory.push({ topic: 'addBarSubscriptions', options })
-        this.socketClient.send('addBarSubscriptions', options)
+        this.providerClient.send('addBarSubscriptions', options)
     }
 
     addBarIndicators(bar: Bar): Bar {
@@ -192,34 +197,73 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     addProviderTradeSubscriptions(options: LiveTradeOptions): any { }
 
     // WebSocket Listener
+    // startSocketListener(subscriptions: MarketDataSubscriptionRequest[]) {
+    //     const wsOptions = getProviderSocketOptionsByType(this.options, 'MarketData', this.mode)
+    //     // console.log('MarketData options', wsOptions)
+    //     const port = wsOptions ? wsOptions.port : 3000
+    //     const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
+    //     this.socketClient = io(`${url}:${port}`)
+    //     this.socketClient.onAny((event: any, ...args: any) => {
+    //         this.emit(event, ...args)
+    //     })
+
+    //     console.log('SOCKET LISTENER SUBSCRIPTIONS', JSON.stringify(subscriptions))
+    //     this.socketClient.on('connect', () => {
+    //         if (subscriptions.length > 0) {
+    //             subscriptions.forEach((s: MarketDataSubscriptionRequest) => {
+    //                 s.options.symbols = this.activeSymbols
+    //                 console.log('ADDING PROVIDER BAR SUBSCRIPTION', JSON.stringify(s.options))
+    //                 switch (s.type) {
+    //                     case 'BAR':
+    //                         this.addProviderBarSubscriptions(s.options)
+    //                         break
+    //                     case 'BOOK':
+    //                         this.addProviderBookSubscriptions(s.options)
+    //                         break
+    //                     case 'TRADE':
+    //                         this.addProviderTradeSubscriptions(s.options)
+    //                         break
+    //                 }
+    //             })
+    //         }
+    //         this.subscriptionHistory.forEach(h => {
+    //             this.socketClient.send(h.topic, h.options)
+    //         })
+    //     })
+    // }
+
     startSocketListener(subscriptions: MarketDataSubscriptionRequest[]) {
+        const mySubs = [...subscriptions]
         const wsOptions = getProviderSocketOptionsByType(this.options, 'MarketData', this.mode)
-        console.log('MarketData options', wsOptions)
+        // console.log('Broker options', wsOptions)
         const port = wsOptions ? wsOptions.port : 3000
         const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
-        this.socketClient = io(`${url}:${port}`)
-        this.socketClient.onAny((event: any, ...args: any) => {
+        this.providerClient = io(`${url}:${port}`)
+        this.providerClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)
         })
 
-        this.socketClient.on('connect', () => {
-            if (subscriptions.length > 0) {
-                subscriptions.forEach((s: MarketDataSubscriptionRequest) => {
-                    switch (s.type) {
-                        case 'BAR':
-                            this.addProviderBarSubscriptions(s.options)
-                            break
-                        case 'BOOK':
-                            this.addProviderBookSubscriptions(s.options)
-                            break
-                        case 'TRADE':
-                            this.addProviderTradeSubscriptions(s.options)
-                            break
-                    }
-                })
-            }
-            this.subscriptionHistory.forEach(h => {
-                this.socketClient.send(h.topic, h.options)
+        // keep subscriptions in memory in case connection is reset
+
+        console.log('*******\nSTART LISTENER SUBS', JSON.stringify(mySubs))
+
+        this.providerClient.on('connect', () => {
+            // subscribe to events on the ProviderServer
+            mySubs.forEach(h => {
+                switch (h.type) {
+                    case 'BAR':
+                        console.log('requesting BAR subscription', h)
+                        this.providerClient.send('addBarSubscriptions', h.options)
+                        break
+                    case 'BOOK':
+                        console.log('requesting BOOK subscription', h)
+                        this.providerClient.send('addBookSubscriptions', h.options)
+                        break
+                    case 'TRADE':
+                        console.log('requesting TRADE subscription', h)
+                        this.providerClient.send('addTradeSubscriptions', h.options)
+                        break
+                }
             })
         })
     }
@@ -229,7 +273,9 @@ export abstract class MarketDataProviderBase extends EventEmitter {
     }
 
     handleBarEvent(bar: Bar, options: any) {
-        if (options.showActive || !bar.inProgress) this.emitter(`${bar.symbol}.bar`, bar)
+        if (options.showActive || !bar.inProgress) {
+            this.emitter(`${bar.symbol}.bar`, bar)
+        }
     }
 
     handleOrderBookEvent(book: OrderBook) {
@@ -238,5 +284,5 @@ export abstract class MarketDataProviderBase extends EventEmitter {
         }
     }
 
-    handleTradeEvent(trade: Trade) {}
+    handleTradeEvent(trade: Trade) { }
 }

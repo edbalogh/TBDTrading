@@ -35,6 +35,7 @@ export abstract class StrategyBase {
     orderErrors: any[] = []
     orderErrorStreak: number = 0
     bars: Bars = {}
+    indicatorSettings: any = {}
 
     constructor(botDetails: BotDetails, symbolDetails: SymbolDetails) {
         this.botDetails = botDetails
@@ -45,6 +46,7 @@ export abstract class StrategyBase {
         this.brokerProvider = this.buildBrokerClass()
         this.orderSizeOptions = botDetails.strategyOptions.orderSizeOptions
         this.orderSizeCalculator = new OrderSizeCalculator(this.botId, this.orderSizeOptions)
+        console.log(`starting ${this.botId} for ${this.symbol.symbol}`)
     }
 
     buildBrokerClass() {
@@ -54,7 +56,7 @@ export abstract class StrategyBase {
         if (!provider) throw new Error(`failed to load Broker for bot ${this.name}, missing providerId in config`)
         const script = provider.scriptLocations.find(l => l.type === 'Broker')
         if (!script) throw new Error(`failed to load Broker for ${this.name}, missing Broker in scriptLocations`)
-        const BrokerProvider = require(`${script.location}`)
+        const BrokerProvider = require(`../../${script.location}`)
         return new BrokerProvider(provider, this.mode)
     }
 
@@ -92,7 +94,7 @@ export abstract class StrategyBase {
     addMarketDataListener(providerOptions: ProviderOptions, subscriptions: MarketDataSubscriptionRequest[] | undefined): void {
         const providerScript = providerOptions.scriptLocations?.find(x => x.type === 'MarketData')
         if (!providerScript) throw new Error('no MarketData provider script found in config')
-        const MarketDataClass = require(providerScript.location)
+        const MarketDataClass = require(`../../${providerScript.location}`)
         const md = new MarketDataClass(providerOptions, this.mode)
         md.on(`${this.symbol?.symbol}.bar`, (bar: Bar) => this._onBarUpdate(bar))
         md.on(`${this.symbol?.symbol}.book`, (book: OrderBook) => this._onOrderBookUpdate(book))
@@ -108,11 +110,14 @@ export abstract class StrategyBase {
 
         // add symbols to subscription options
         subscriptions?.forEach((s: any) => {
+            // setup indicators for bar data
+            if (s.type === 'BAR' && s.options && s.options.indicators) this.indicatorSettings = s.options.indicators
             if (!s.options) s.options = {}
             s.options.symbols = symbols
         })
 
         // start listener
+        console.log('SUBSCRIPTIONS AFTER', JSON.stringify(subscriptions))
         md.startSocketListener(subscriptions)
         this.connections.push({ class: md, options: providerOptions })
     }
@@ -156,8 +161,8 @@ export abstract class StrategyBase {
         this.brokerProvider.on(`${this.symbol?.symbol}.orderPlaced`, (data: any) => this._onOrderRequestSuccess(data))
 
         const updatedSubscriptions = subscriptions?.map(s => {
-            if(s.type === 'ORDER') {
-                if(!s.options.symbols) s.options.symbols = []
+            if (s.type === 'ORDER') {
+                if (!s.options.symbols) s.options.symbols = []
                 s.options.symbols.push(this.symbol.symbol)
             }
             return s
@@ -182,10 +187,10 @@ export abstract class StrategyBase {
         const lastPrice = await this.brokerProvider.getLastBrokerTrade(orderRequest.symbol)
         const availableCapital = await this.brokerProvider.getAvailableCapital(orderRequest.currency || this.botDetails.baseCurrency);
         this.orderSizeCalculator.calculateOrderSize(finalOrderRequest, lastPrice, availableCapital)
-       
+
         console.log('PLACING ORDER', finalOrderRequest)
         this.brokerProvider.orderManager.pendingOrders.push(finalOrderRequest)
-        this.brokerProvider.socketClient.emit('placeOrder', finalOrderRequest)
+        this.brokerProvider.providerClient.emit('placeOrder', finalOrderRequest)
     }
 
     /**
@@ -193,12 +198,12 @@ export abstract class StrategyBase {
      * @param bar bar data from market data event
      */
     async _onBarUpdate(bar: Bar): Promise<void> {
-        if(!this.bars[bar.timeframe]) {
+        if (!this.bars[bar.timeframe]) {
             console.log(`creating bar container for ${bar.timeframe}`)
-            this.bars[bar.timeframe] = new BarAggregator({botId: this.botId, symbol: this.symbol.symbol, mode: this.mode, timeframe: bar.timeframe, barsToPrime: 1})
+            this.bars[bar.timeframe] = new BarAggregator({ botId: this.botId, symbol: this.symbol.symbol, mode: this.mode, timeframe: bar.timeframe, barsToPrime: 1, indicatorSettings: this.indicatorSettings })
         }
         const aggBar = await this.bars[bar.timeframe].updateBars(bar)
-        if(aggBar) return this.onNextBar(aggBar)
+        if (aggBar) return this.onNextBar(aggBar)
     }
 
     addBarIndicators(bar: Bar): Bar {
@@ -208,7 +213,7 @@ export abstract class StrategyBase {
 
     async _onOrderUpdate(data: any): Promise<void> {
         // console.log('ON ORDER UPDATE', data.order, data.position)
-        if(!data.order) return
+        if (!data.order) return
         this.activeOrders = this.activeOrders.filter((o: Order) => o.id !== data.order.id)
         this.pendingOrders = this.pendingOrders.filter((r: OrderRequest) => r.id !== data.order.id)
         if (data.order.isActive) {
@@ -216,7 +221,7 @@ export abstract class StrategyBase {
         }
 
         // refresh position
-        this.position = data.position.status === 'ACTIVE' ? data.position : undefined
+        this.position = data.position && data.position.status === 'ACTIVE' ? data.position : undefined
         return this.onOrderUpdate(data.order)
     }
 

@@ -11,8 +11,15 @@
                 {
                     "type": "BAR",
                     "options": {
-                        "timeframe": "1m",
+                        "timeframe": "15m",
                         "showActive": false
+                    },
+                    "indicators": {
+                        "avgVolume": {
+                            "type": "SMA",
+                            "period": 4,
+                            "values": { "barData": "volume" }
+                        }     
                     }
                 }
             ]
@@ -30,11 +37,25 @@
     ],
     "symbols": [
         {
-            "symbol": "ADAUSDT",
+            "symbol": "AMPUSDT",
             "status": "ACTIVE",
             "providerId": "binance",
             "reference": false,
             "pair": [ "ADA", "USDT" ]
+        },
+        {
+            "symbol": "MATICUSDT",
+            "status": "ACTIVE",
+            "providerId": "binance",
+            "reference": false,
+            "pair": [ "MATIC", "USDT" ]
+        },
+        {
+            "symbol": "SOLUSDT",
+            "status": "ACTIVE",
+            "providerId": "binance",
+            "reference": false,
+            "pair": [ "SOL", "USDT" ]
         }
     ],
     "baseCurrency": "USDT",
@@ -46,9 +67,9 @@
         "parameterDetails": {},
         "orderSizeOptions": {
             "supportsFractionalShares": true,
-            "tradeSizeAmount": 25,
-            "maxCapitalPerSymbol": 100,
-            "maxCapitalPerStrategy": 500
+            "tradeSizeAmount": 1000,
+            "maxCapitalPerSymbol": 1000,
+            "maxCapitalPerStrategy": 5000
         }
     }
 }

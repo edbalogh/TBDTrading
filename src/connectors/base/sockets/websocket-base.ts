@@ -35,7 +35,7 @@ export class WebSocketServerBase {
         this.connectionTime = new Date()
     }
     
-    startServer() {
+    startServer(): Server {
         const app: Express = express()
         const server = http.createServer(app);
         server.listen(this.port, () => console.log(`Listening on port: ${this.port}`));
@@ -63,7 +63,9 @@ export class WebSocketServerBase {
             })
 
             socket.on('ping', () => socket.emit('pong'))
-        })        
+        })
+
+        return this.socketServer
     }
 
     emit(topic: string, ...args: any[]) {
@@ -76,11 +78,11 @@ export class WebSocketServerBase {
     
     addSubscription(connectionId: string, type: SubscriptionType, options: any) {
         if (this.subscriptionExists(type, options)) {
-            console.log(`adding new connection ${connectionId} to existing type ${type}`)
+            console.log(`adding new connection ${connectionId} to existing type ${type}`, JSON.stringify(options))
             const subscriptionDetails = this.findSubscriptionDetails(type, options)
             if (!subscriptionDetails.connections.includes(connectionId)) subscriptionDetails.connections.push(connectionId)
         } else {
-            console.log(`adding new subscription type ${type} with connection ${connectionId}`)
+            console.log(`adding new subscription type ${type} with connection ${connectionId}`, JSON.stringify(options))
             this.activeSubscriptions.push({type, options, connections: [connectionId]})
         }
     }

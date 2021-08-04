@@ -1,17 +1,17 @@
 {
-    "id": "bgtst1",
-    "name": "bgrid-binance-test",
+    "id": "basic-grid-kucion-test1",
+    "name": "bgrid-kucoin-test",
     "mode": "LIVE",
     "status": "ACTIVE",
     "providers": [
         {
-            "providerId": "binance",
+            "providerId": "kucoin",
             "providerType": "MarketData",
             "subscriptions": [
                 {
                     "type": "BAR",
                     "options": {
-                        "timeframe": "1m",
+                        "timeframe": "1min",
                         "showActive": false,
                         "barsToPrime": 1,
                         "indicators": {
@@ -31,7 +31,7 @@
             ]
         },
         {
-            "providerId": "binance",
+            "providerId": "kucoin",
             "providerType": "Broker",
             "subscriptions": [
                 {
@@ -43,32 +43,18 @@
     ],
     "symbols": [
         {
-            "symbol": "ADAUSDT",
+            "symbol": "ADA-USDT",
             "status": "ACTIVE",
-            "providerId": "binance",
+            "providerId": "kucoin",
             "reference": false,
             "pair": [ "ADA", "USDT" ]
         },
         {
-            "symbol": "ETHUSDT",
+            "symbol": "ETH-USDT",
             "status": "ACTIVE",
-            "providerId": "binance",
+            "providerId": "kucoin",
             "reference": false,
             "pair": [ "ETH", "USDT" ]
-        },
-        {
-            "symbol": "AMPUSDT",
-            "status": "ACTIVE",
-            "providerId": "binance",
-            "reference": false,
-            "pair": [ "AMP", "USDT" ]
-        },
-        {
-            "symbol": "LINKUSDT",
-            "status": "ACTIVE",
-            "providerId": "binance",
-            "reference": false,
-            "pair": [ "LINK", "USDT" ]
         }
     ],
     "baseCurrency": "USDT",

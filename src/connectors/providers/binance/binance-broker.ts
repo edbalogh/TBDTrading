@@ -10,13 +10,12 @@ const Binance = require('binance-api-node').default
 const utils = require('../../../utils/legacy')
 
 export class BinanceBroker extends BrokerProviderBase {
-    providerSocket: any
+    clientSocket: any
     exchangeInfo?: any
-    binanceClient: any
     
     constructor(options: ProviderOptions, mode: Mode) {
         super(options, mode)
-        this.binanceClient = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
+        this.spotApi = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
     }
 
     async initialize() {
@@ -26,7 +25,7 @@ export class BinanceBroker extends BrokerProviderBase {
 
     async getExchangeInfo(): Promise<any> {
         try {
-            const response = await this.binanceClient.exchangeInfo()
+            const response = await this.spotApi.exchangeInfo()
             if (response.error) throw new Error(response.error)
             return response
         } catch(e) {
@@ -36,7 +35,7 @@ export class BinanceBroker extends BrokerProviderBase {
 
     async getLastBrokerTrade(symbol: string): Promise<Number | undefined> {
         try {
-            const response = await this.binanceClient.prices({symbol})
+            const response = await this.spotApi.prices({symbol})
             if (response.error) throw new Error(response.error)
             return Number(response[symbol])
         } catch(e) {
@@ -46,7 +45,7 @@ export class BinanceBroker extends BrokerProviderBase {
 
     async getCurrentAccountInfo(): Promise<AccountInfo | undefined> {
         try {
-            const response = await this.binanceClient.accountInfo();
+            const response = await this.spotApi.accountInfo();
             if (response.error) throw new Error(response.error);
             return this.translateAccountInfo(response);
         } catch(e) {
@@ -69,7 +68,8 @@ export class BinanceBroker extends BrokerProviderBase {
 
     addProviderUserSubscriptions(): void {
         console.log('addProviderOrderSubscriptions')
-        this.providerSocket = this.binanceClient.ws.user((event: any) => {
+        if (this.brokerSocket) return
+        this.brokerSocket = this.spotApi.ws.user((event: any) => {
             switch (event.eventType) {
                 case 'executionReport':
                     // console.log('binance execution event', event)
@@ -150,8 +150,6 @@ export class BinanceBroker extends BrokerProviderBase {
     }
 
 
-
-
     //////////////////
     // Order Handling
 
@@ -189,11 +187,12 @@ export class BinanceBroker extends BrokerProviderBase {
             }            
         } else {
             if(orderRequest.limitPrice) {
-                brokerOrder.price = orderRequest.isExit ? brokerOrder.price = orderRequest.limitPrice : this.applyPrecisionToTradePrice(orderRequest.symbol, orderRequest.limitPrice);
+                brokerOrder.price = this.applyPrecisionToTradePrice(orderRequest.symbol, orderRequest.limitPrice);
             }
         }
         
-        return brokerOrder
+        // add any broker specific options sent directly from the model and return
+        return {...brokerOrder, ...orderRequest.brokerSpecificOptions}
     }
 
     orderTypeToBrokerType(type: OrderType): BrokerOrderType {
@@ -210,7 +209,7 @@ export class BinanceBroker extends BrokerProviderBase {
     async placeBrokerOrder(brokerOrder: any) {
         try {
             console.log('submitting order', brokerOrder)
-            const response = brokerOrder.listClientOrderId ? await this.binanceClient.orderOco(brokerOrder) : await this.binanceClient.order(brokerOrder);
+            const response = brokerOrder.listClientOrderId ? await this.spotApi.orderOco(brokerOrder) : await this.spotApi.order(brokerOrder);
             if (response.error) {
                 throw new Error(response.error);
             }

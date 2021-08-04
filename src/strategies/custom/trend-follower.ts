@@ -10,18 +10,11 @@ export class TrendFollower extends StrategyBase {
     
     constructor(options: BotDetails, symbolDetails: SymbolDetails) {
         super(options, symbolDetails)
-        
     }
 
+    
     async onOrderFinished(order: Order) {
         // console.log('order finished', order)
-    }
-
-    async evaluateExit() {
-        if(this.position?.orders.find(o => o.isActive)) return
-        // return this.placeOrder({
-        //     symbol: this.symbol.symbol, side: 'SELL', type: 'MARKET', isExit: true, requestedShares: this.position?.currentShares
-        // })
     }
 
     async onOrderUpdate(order: Order) {
@@ -50,7 +43,7 @@ export class TrendFollower extends StrategyBase {
     }
     
     async onOrderBookUpdate(book: OrderBook): Promise<void> {
-        // console.log('new order book', book)
+        console.log('new order book', book)
         return
     }
 
@@ -68,17 +61,17 @@ export class TrendFollower extends StrategyBase {
             console.log('no long entry, previous bar is not red')
             return
         }
-        if(this.currentBar.volume || 0 < this.currentBar.indicators.avgVolume * 1.25) {
-            console.log('no long entry, volume too low')
-            return
-        }
+        // if(this.currentBar.volume || 0 < this.currentBar.indicators.avgVolume * 1.25) {
+        //     console.log('no long entry, volume too low')
+        //     return
+        // }
         
         return this.placeOrder({
             symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100
         })
     }
 
-    async evaluateExistingPosition() {
+    async evaluateExit() {
         if(!this.currentBar || this.currentBar.inProgress || !this.previousBar) {
             console.log(`BARS NOT READY ON EXIT?, current=${this.currentBar}, previous=${this.previousBar}`)
             return

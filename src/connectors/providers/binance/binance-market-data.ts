@@ -14,12 +14,13 @@ const utils = require('../../../utils/legacy.js')  // TODO: deprecate the legacy
 export class BinanceMarketData extends MarketDataProviderBase {
     providerSocket: any
     constructor(options: ProviderOptions, mode: Mode) {
-        const client = new Binance(options.apiOptions)  // TODO: pull the provider dynamically
-        super(options, mode, client)
+        super(options, mode)
+        this.spotApi = new Binance(options.apiOptions)
+        this.spotEnabled = true
     }
 
     static parameterDetails() {
-        const details = {...MarketDataProviderBase.parameterDetails() }
+        const details = { ...MarketDataProviderBase.parameterDetails() }
         details.interval.templateOptions.options = [
             { value: '1m', label: '1 Minute' },
             { value: '3m', label: '3 Minute' },
@@ -105,7 +106,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
         // builds a list of symbols each with a list of bars for that symbol
         await Promise.all(finalSymbols.map(async (s) => {
             finalOptions.symbol = s
-            let batch: CandleChartResult[] = await this.client.candles({ ...finalOptions })
+            let batch: CandleChartResult[] = await this.spotApi.candles({ ...finalOptions })
             this._sendBarBatchEvents(batch, finalOptions.interval, s)
             let barCount = batch.length
 
@@ -116,7 +117,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
                 // change startTime to 1s after last bar receieved
                 updatedOptions.startTime = Number((last(batch) as CandleChartResult).openTime) + 1000
                 updatedOptions.symbol = s
-                batch = await this.client.candles({ ...updatedOptions });
+                batch = await this.spotApi.candles({ ...updatedOptions });
                 this._sendBarBatchEvents(batch, finalOptions.interval, s)
                 barCount += batch.length;
             }
@@ -156,7 +157,7 @@ export class BinanceMarketData extends MarketDataProviderBase {
      * @param options platforms LiveBarOptions
      */
     addProviderBarSubscriptions(options: LiveBarOptions): void {
-        this.providerSocket = this.client.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
+        this.providerSocket = this.spotApi.ws.candles(options.symbols || this.activeSymbols, options.timeframe || '1m', (event: Candle) => {
             switch (event.eventType) {
                 case 'kline':
                     super.handleBarEvent(this.translateLiveBar(event), options)                    
@@ -186,12 +187,12 @@ export class BinanceMarketData extends MarketDataProviderBase {
         return <OrderBook>book
     }
 
-    addProviderBookSubscriptions(options: LiveOrderBookOptions): any {   
-        console.log('addProviderBookSubscriptions')     
-        this.providerSocket = this.client.ws.depth(options.symbols, (event: Depth) => {
+    addProviderBookSubscriptions(options: LiveOrderBookOptions): any {
+        console.log('addProviderBookSubscriptions')
+        this.providerSocket = this.spotApi.ws.depth(options.symbols, (event: Depth) => {
             switch (event.eventType) {
                 case 'depthUpdate':
-                    super.handleOrderBookEvent(this.translateLiveOrderBook(event))                    
+                    super.handleOrderBookEvent(this.translateLiveOrderBook(event))
                     break
                 default:
                     console.log(`untracked websocket event`)

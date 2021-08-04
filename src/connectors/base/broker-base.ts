@@ -21,11 +21,16 @@ export abstract class BrokerProviderBase extends EventEmitter {
     mode: Mode
     isActive: boolean = false
     providerServer?: Server     // represents the websocket server if instantiate for that purpose    
-    socketClient: any       // represents the websocket listener to the provider service (each class will instantiate one or the other)
+    providerClient: any       // represents the websocket listener to the provider service (each class will instantiate one or the other)
     subscriptionHistory: any[] = []
     activeSymbols: string[] = []
     positionManager: PositionManager = new PositionManager()
     orderManager: OrderManager = new OrderManager()
+    spotEnabled: boolean = false
+    spotApi?: any
+    futuresEnabled: boolean = false
+    futuresApi?: any
+    brokerSocket?: Server
 
     constructor(options: ProviderOptions, mode: Mode) {
         super()
@@ -111,8 +116,9 @@ export abstract class BrokerProviderBase extends EventEmitter {
      * @param event event that is being sent out
      * @param data data that goes with the event
      */
-    emitter(event: string, data: any) {
-        this.providerServer ? this.providerServer.emit(event, data) : this.emit(event, data)
+    async emitter(event: string, data: any) {
+        this.providerServer ? await this.providerServer.emit(event, data) : this.emit(event, data)
+        return
     }
 
     setProviderServer(server: Server) {
@@ -137,32 +143,31 @@ export abstract class BrokerProviderBase extends EventEmitter {
 
     startSocketListener(subscriptions: BrokerSubscriptionRequest[]) {
         const wsOptions = getProviderSocketOptionsByType(this.options, 'Broker', this.mode)
-        console.log('Broker options', wsOptions)
+        // console.log('Broker options', wsOptions)
         const port = wsOptions ? wsOptions.port : 3000
         const url = wsOptions && wsOptions.url ? wsOptions.url : 'http://localhost'
-        this.socketClient = io(`${url}:${port}`)
-        this.socketClient.onAny((event: any, ...args: any) => {
+        this.providerClient = io(`${url}:${port}`)
+        this.providerClient.onAny((event: any, ...args: any) => {
             this.emit(event, ...args)
         })
 
         // keep subscriptions in memory in case connection is reset
         this.subscriptionHistory = this.subscriptionHistory.concat(subscriptions)
 
-        this.socketClient.on('connect', (socket: Socket) => {
+        this.providerClient.on('connect', (socket: Socket) => {
             // subscribe to events on the ProviderServer
             this.subscriptionHistory.forEach(h => {
                 if (h.type === 'ORDER') {
                     console.log('requesting ORDER subscription', h)
-                    this.socketClient.send('addOrderSubscriptions', h.options)
+                    this.providerClient.send('addOrderSubscriptions', h.options)
                 }
             })
         })
     }
 
     stopSocketListener() {
-        this.socketClient.close()
+        this.providerClient.close()
     }
-
 
     /////////////////////
     // Order Handling

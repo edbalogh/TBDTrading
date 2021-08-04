@@ -29,7 +29,7 @@ export class BasicGrid extends StrategyBase {
         }
         if(this.activeOrders.length + this.pendingOrders.length > 0) return
         return this.placeOrder({
-            symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100
+            symbol: this.symbol.symbol, side: 'BUY', type: 'MARKET', isExit: false, requestedAmount: 100     // TODO: calculate order size
         })
     }
 
